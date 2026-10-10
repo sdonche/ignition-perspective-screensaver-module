@@ -264,25 +264,60 @@ export function inWindow(m: number, from: number, to: number): boolean {
     return from < to ? m >= from && m < to : m >= from || m < to;
 }
 
-export interface DimConfig {
+/** What the night window does while the page is idle. */
+export type NightMode = 'blank' | 'clock' | 'dim';
+
+export function normNightMode(value: string): NightMode {
+    const v = (value || '').trim().toLowerCase();
+    return v === 'clock' || v === 'dim' ? v : 'blank';
+}
+
+/**
+ * The night window (burn-in and power care). While idle inside it the screen
+ * goes blank (nothing rendered), shows the plain clock, or keeps the
+ * configured mode dimmed to `level`.
+ */
+export interface NightConfig {
     enabled: boolean;
     from: string;
     to: string;
+    mode: NightMode;
     level: number;
 }
 
-/** The brightness to apply while idle (1 = no dimming). */
-export function dimLevel(cfg: DimConfig, date: Date, alarmPinned: boolean): number {
-    if (!cfg.enabled || alarmPinned) {
-        return 1;
+/** Is `date` (browser local time) inside an enabled, well-formed night window? */
+export function isNight(cfg: NightConfig, date: Date): boolean {
+    if (!cfg.enabled) {
+        return false;
     }
     const from = parseClock(cfg.from);
     const to = parseClock(cfg.to);
     if (from === null || to === null) {
+        return false;
+    }
+    return inWindow(date.getHours() * 60 + date.getMinutes(), from, to);
+}
+
+/** The brightness to apply while idle (1 = no dimming): only the 'dim' night mode dims, and a pinned alarm lifts it. */
+export function dimLevel(cfg: NightConfig, date: Date, alarmPinned: boolean): number {
+    if (cfg.mode !== 'dim' || alarmPinned || !isNight(cfg, date)) {
         return 1;
     }
-    const level = Number.isFinite(cfg.level) ? Math.min(1, Math.max(0, cfg.level)) : 1;
-    return inWindow(date.getHours() * 60 + date.getMinutes(), from, to) ? level : 1;
+    return Number.isFinite(cfg.level) ? Math.min(1, Math.max(0, cfg.level)) : 1;
+}
+
+// --- reduced motion -------------------------------------------------------------
+
+export type ReduceMotionSetting = 'auto' | 'always' | 'never';
+
+export function normReduceMotion(value: string): ReduceMotionSetting {
+    const v = (value || '').trim().toLowerCase();
+    return v === 'always' || v === 'never' ? v : 'auto';
+}
+
+/** Resolve the setting against the browser's prefers-reduced-motion (auto). */
+export function wantsReducedMotion(setting: ReduceMotionSetting, prefers: boolean): boolean {
+    return setting === 'always' || (setting === 'auto' && prefers);
 }
 
 /**

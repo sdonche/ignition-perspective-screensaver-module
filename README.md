@@ -59,9 +59,12 @@ stations.
    alarm at or above a chosen priority wakes the screen and keeps it awake;
    lower ones pin a banner over the idle mode. An active critical alarm is
    never covered. If the guard cannot hear the gateway, it removes itself.
-7. **Burn-in care for 24/7 screens.** Text in the idle modes drifts slowly so
-   nothing sits on the same pixels, and the screen can dim on a night schedule
-   while idle (lifted by an alarm).
+7. **Burn-in and power care for 24/7 screens.** Text in the idle modes drifts
+   slowly so nothing sits on the same pixels. At night (22:00-06:00 by default)
+   an idle screen goes blank, so nothing is rendered; alarms still wake it. The
+   default mode is the plain clock; the animated modes are opt-in.
+8. **Reduced motion.** When the browser asks for less motion (or
+   `config.reduceMotion` is `always`), the animated modes give way to the clock.
 
 | Aurora: one curtain per line | Halo: Line 1 in fault |
 |---|---|
@@ -88,6 +91,9 @@ Perspective's own inactivity timeout and authentication.
 3. Set `config.timeoutSec` and `config.mode`, and bind `lines[]` (and
    `modes.*`) to your tags.
    The [reference](docs/reference.md#props) lists every prop.
+4. On a public or lobby screen, set `alarm.sources`: every session with a
+   guard receives the matching alarms' labels, whoever is logged in. See
+   [who sees the alarms](docs/reference.md#who-sees-the-alarms).
 
 ## Status
 

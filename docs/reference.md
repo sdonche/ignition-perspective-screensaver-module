@@ -20,7 +20,8 @@ One component, the **Idle Guard** (`mustrysolutions.perspective.screensaver.idle
 | Shuffle through the animated modes; clock, blank, external | Done |
 | 2D fallback for browsers without WebGL2; automatic quality steps for weak kiosks | Done |
 | Alarm policy: wake, pin banner, Critical always wakes, fail open on a stale feed | Done, unit- and e2e-tested |
-| Burn-in: drifting text, night dimming while idle | Done |
+| Burn-in and power: drifting text, a night window (blank by default) | Done |
+| Reduced motion: animated modes give way to the clock | Done |
 | Screen Wake Lock (HTTPS only) | Done, not e2e-tested (the dev gateway is plain HTTP) |
 | Designer: inert, shows a chip | Done |
 
@@ -41,8 +42,10 @@ Deliberate, following the review of the spec before building:
   gateway, instead of an `AlarmListener` per delegate. `AlarmManager.addListener`
   takes one source path, so a listener per guard would not cover "every alarm",
   and one query per tick costs the same whatever the number of displays.
-- **Dimming applies only while idle.** The spec dims the wall on a schedule;
-  dimming a screen someone is using is not what an operator wants.
+- **The night window applies only while idle**, and by default blanks the
+  screen rather than dimming it. The spec dims the wall on a schedule; dimming
+  a screen someone is using is not what an operator wants, and a dimmed
+  animation still costs the graphics card its full load all night.
 - **The demo pipes are not the plant's pipe topology.** They are generic
   pipes, one per bound state/flow. Drawing the real routing needs the P&ID,
   which is the HMI Kit fly-through idea, not this module.
@@ -71,7 +74,12 @@ Browser (Perspective client)                       Gateway
 - `guardProps.ts`: PropertyTree → typed props.
 - `guardDelegate.ts`: the store delegate; parses feed messages and stamps them
   with the **browser's** clock (staleness never compares two clocks).
-- `IdleGuard.tsx`: wires it together.
+- `IdleGuard.tsx`: the component: lifecycle, input handling, the state
+  machine, outputs, wake lock. It portals a `Cover` while idle.
+- `Cover.tsx`: what the cover shows, rendered from props: the mode (via
+  `modes/modeToShow.ts`), clock, legend, halo labels, banner, dimming.
+- `CanvasMode.tsx`: the canvas behind the animated modes (renderer choice,
+  fallback, frame loop).
 - `modes/`: the canvas modes. See [Idle modes and rendering](#idle-modes-and-rendering).
 
 **Input handling.** All listeners are on `window` in the capture phase, so
@@ -168,6 +176,29 @@ to 30 fps (a 24/7 wall does not need 60, and pays for it in power and heat).
 query `?quality=high&fault=1&lines=5&legacy=1`). It runs the renderers without
 Perspective, which is the fast loop for visual work. Not part of the module.
 
+### What the cover shows
+
+`modes/modeToShow.ts` (pure, tested) starts from `config.mode` and applies,
+in order:
+
+1. `external` stays external: the project draws.
+2. **Night window** (`burnIn.night`, on by default, 22:00-06:00 browser local
+   time): `blank` (default) or `clock` replaces any mode; `dim` keeps the mode
+   and dims it to `level`. Alarms behave as always: a wake alarm wakes, a
+   pinned one shows its banner and lifts the dimming.
+3. **Shuffle** picks the mode for this slot.
+4. **Reduced motion**: when the viewer wants less motion, every animated mode
+   becomes the clock. `config.reduceMotion` `auto` follows the browser's
+   `prefers-reduced-motion`; `always` forces it on a kiosk that has no such
+   setting; `never` ignores it.
+
+The overlay carries `data-mode` (what is shown) and `data-reason`
+(`configured`, `night`, `shuffle`, `reduced-motion`).
+
+The default `config.mode` is `clock`: it renders no canvas at all, so a guard
+dropped in with no configuration costs no graphics load on a 24/7 screen.
+The animated modes are opt-in.
+
 ### Gateway
 
 - `AlarmFeed`: one daemon thread per gateway. Reads active, unshelved alarms
@@ -184,6 +215,23 @@ Perspective, which is the fast loop for visual work. Not part of the module.
 Event names live in `guardDelegate.ts` and `GuardModelDelegate.java`; change
 both.
 
+### Who sees the alarms
+
+Every session that has an Idle Guard receives, every couple of seconds, the
+active alarm counts and the top three alarms (label and display path) that
+match its `alarm.sources`. There is **no permission check**: it goes to the
+session whoever is logged in, or nobody. That is what any Alarm Status Table
+in a view does too, but the guard sits in a shared dock on every page, so it
+is easy to forget.
+
+- On a lobby, canteen or other public screen, set `alarm.sources` to the
+  alarms that screen may show. A pattern that matches nothing hides every
+  alarm from it, but then no alarm wakes that screen either.
+- The counts and labels never leave the gateway for a session without a
+  guard, and the delegate never accepts anything from the browser but its
+  source patterns.
+
+
 ## Props
 
 The full schema with descriptions is
@@ -193,7 +241,8 @@ The full schema with descriptions is
 |---|---|---|
 | `config.enabled` | true | Off wakes the page and stops detection |
 | `config.timeoutSec` | 600 | Minimum 5 |
-| `config.mode` | pipes | pipes, aurora, halo, starfield, synthwave, lava, tunnel, flow, bounce, pong, ducks, shuffle, clock, blank, external |
+| `config.mode` | clock | pipes, aurora, halo, starfield, synthwave, lava, tunnel, flow, bounce, pong, ducks, shuffle, clock, blank, external |
+| `config.reduceMotion` | auto | auto (browser preference), always, never |
 | `config.quality` | auto | auto, high, low (see Quality) |
 | `config.wakeOnMove` / `moveThresholdPx` | true / 8 | Mouse movement counts beyond the threshold |
 | `config.wakeLock` | false | Screen Wake Lock; HTTPS only |
@@ -203,7 +252,7 @@ The full schema with descriptions is
 | `alarm.sources` | [] | Glob patterns; empty = all alarms |
 | `alarm.staleAfterSec` | 8 | Fail open after this much feed silence (min 3) |
 | `burnIn.drift` | true | Text wanders on a 7/11-minute Lissajous path |
-| `burnIn.dim` | off, 22:00–06:00, 0.4 | While idle; lifted by a pinned alarm |
+| `burnIn.night` | on, 22:00–06:00, blank, 0.4 | While idle inside the window: `mode` blank, clock or dim (to `level`) |
 | `lines` | demo set | `[{label, state, flow, color}]`, max 12: one pipe, curtain (max 6) or ring each. state: running, idle, warning, fault, off |
 | `modes.legend` | true | Line legend over pipes and aurora |
 | `modes.clock` | | `title` (also shown in halo), `showSeconds` |

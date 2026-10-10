@@ -10,19 +10,13 @@ import {
     PropertyTree,
     Size2d
 } from '@inductiveautomation/perspective-client';
+import { Cover } from './Cover';
 import { GuardDelegateState, GuardStoreDelegate } from './guardDelegate';
-import { CANVAS_MODES, GL_MODES, GuardProps, mapGuardProps, MAX_LINES, Mode } from './guardProps';
-import { MAX_CURTAINS } from './modes/gl/aurora';
+import { GuardProps, mapGuardProps } from './guardProps';
 import {
-    AlarmPolicy, AlarmVerdict, countsText, dimLevel, drift, evaluateAlarms, IdleState, initialState, input,
-    movedEnough, plural, Point, PRIORITIES, StepResult, tick, timeoutMs, WakeCause
+    AlarmPolicy, AlarmVerdict, evaluateAlarms, IdleState, initialState, input, movedEnough, Point, StepResult, tick,
+    timeoutMs, WakeCause, wantsReducedMotion
 } from './idleLogic';
-import { FrameLoop } from './modes/frameLoop';
-import { HALO_DRIFT, HALO_LABEL_ANGLE, haloRadii } from './modes/haloLayout';
-import { create2DRenderer, createGLRenderer } from './modes/index';
-import { shufflePick } from './modes/shuffle';
-import { pipeColor } from './modes/pipesSim';
-import { GLMode, ModeRenderer } from './modes/renderer';
 
 // Must match IdleGuard.COMPONENT_ID on the Java side.
 export const COMPONENT_TYPE = 'mustrysolutions.perspective.screensaver.idleguard';
@@ -66,6 +60,15 @@ function isDesigner(store: AbstractUIElementStore): boolean {
     }
 }
 
+/** The browser's prefers-reduced-motion (set in the OS, or by a kiosk policy). */
+function prefersReducedMotion(): boolean {
+    try {
+        return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {
+        return false;
+    }
+}
+
 function policyOf(p: GuardProps): AlarmPolicy {
     return {
         wakePriority: p.alarm.wakePriority,
@@ -94,7 +97,7 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
     private written: Record<string, unknown> = {};
     private lastInputWritten = 0;
     private lastResubscribe = 0;
-    /** When the current cover went up (shuffle's clock). */
+    /** When the current cover went up (shuffle's clock, passed to the Cover). */
     private coverSince = 0;
     /** The feed message the banner last rendered, so a new top alarm re-renders it. */
     private bannerSeq = -1;
@@ -393,222 +396,19 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
                         Idle Guard · {p.config.enabled ? `${p.config.mode} after ${Math.round(timeoutMs(p.config.timeoutSec) / 1000)} s` : 'disabled'}
                     </span>
                 )}
-                {this.live && this.host && this.state.covering && ReactDOM.createPortal(this.renderCover(), this.host)}
-            </div>
-        );
-    }
-
-    private renderCover(): React.ReactNode {
-        const p = this.props.props;
-        const { fading, verdict, now } = this.state;
-        const shuffling = p.config.mode === 'shuffle';
-        // Shuffle keys off when this cover went up, which (unlike idleSince) holds through the fade-out.
-        const mode: Mode = shuffling
-            ? shufflePick(p.modes.shuffle.modes, this.coverSince, now, p.modes.shuffle.minutes)
-            : p.config.mode;
-        const pinned = verdict !== null && verdict.pin;
-        const dim = dimLevel(p.burnIn.dim, new Date(now), pinned);
-        const dimLayer = dim < 1 ? <div className="mustry-idle-dim" style={{ opacity: (1 - dim).toFixed(3) }} /> : null;
-        if (mode === 'external') {
-            return dimLayer;
-        }
-        const d = p.burnIn.drift ? drift(now) : { x: 0, y: 0 };
-        const driftStyle = { transform: `translate(${(d.x * 18).toFixed(2)}vw, ${(d.y * 14).toFixed(2)}vh)` };
-        return (
-            <div
-                className={`mustry-idle-overlay mustry-idle-overlay--${mode}${fading ? ' mustry-idle-overlay--fading' : ''}`}
-                data-mode={mode}
-                data-shuffle={shuffling ? 'true' : undefined}
-                role="presentation"
-            >
-                {CANVAS_MODES.includes(mode) && <CanvasMode mode={mode} props={p} />}
-                {mode === 'clock' && this.renderClock(now, driftStyle)}
-                {mode === 'halo' && this.renderHalo(now)}
-                {(mode === 'pipes' || mode === 'aurora') && p.modes.legend && this.renderLegend(mode, driftStyle)}
-                {mode === 'starfield' && p.modes.starfield.caption.trim() !== '' && (
-                    <div className="mustry-idle-caption" style={driftStyle}>{p.modes.starfield.caption}</div>
+                {this.live && this.host && this.state.covering && ReactDOM.createPortal(
+                    <Cover
+                        props={p}
+                        feed={this.props.delegate ? this.props.delegate.feed : null}
+                        verdict={this.state.verdict}
+                        now={this.state.now}
+                        fading={this.state.fading}
+                        coverSince={this.coverSince}
+                        reduceMotion={wantsReducedMotion(p.config.reduceMotion, prefersReducedMotion())}
+                    />,
+                    this.host
                 )}
-                {pinned && verdict && this.renderBanner(verdict, driftStyle)}
-                {mode !== 'blank' && <div className="mustry-idle-hint" style={driftStyle}>Touch, click or press a key to wake</div>}
-                {dimLayer}
             </div>
-        );
-    }
-
-    private renderClock(now: number, style: React.CSSProperties): React.ReactNode {
-        const c = this.props.props.modes.clock;
-        const date = new Date(now);
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: c.showSeconds ? '2-digit' : undefined });
-        const day = date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
-        return (
-            <div className="mustry-idle-clock" style={style}>
-                <div className="mustry-idle-clock__time">{time}</div>
-                <div className="mustry-idle-clock__date">{day}</div>
-                {c.title.trim() !== '' && <div className="mustry-idle-clock__title">{c.title}</div>}
-            </div>
-        );
-    }
-
-    private renderLegend(mode: Mode, style: React.CSSProperties): React.ReactNode {
-        const lines = mode === 'aurora' ? this.props.props.lines.slice(0, MAX_CURTAINS) : this.props.props.lines;
-        return (
-            <ul className="mustry-idle-legend" style={style}>
-                {lines.map((line, i) => (
-                    <li key={i} className="mustry-idle-legend__item">
-                        <span className="mustry-idle-legend__dot" style={{ background: pipeColor(line.state, line.color) }} />
-                        <span className="mustry-idle-legend__label">{line.label || `Line ${i + 1}`}</span>
-                        <span className="mustry-idle-legend__state">{line.state}</span>
-                    </li>
-                ))}
-            </ul>
-        );
-    }
-
-    /** Halo's DOM half: the clock in the middle and a label beside each ring, drifting with the shader's centre. */
-    private renderHalo(now: number): React.ReactNode {
-        const p = this.props.props;
-        const c = p.modes.clock;
-        const d = p.burnIn.drift ? drift(now) : { x: 0, y: 0 };
-        const date = new Date(now);
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const day = date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
-        const lines = p.lines.slice(0, MAX_LINES);
-        const radii = haloRadii(lines.length);
-        const cos = Math.cos(HALO_LABEL_ANGLE);
-        const sin = Math.sin(HALO_LABEL_ANGLE);
-        return (
-            <div
-                className="mustry-idle-halo"
-                style={{ transform: `translate(${(d.x * HALO_DRIFT.x * 100).toFixed(3)}vw, ${(d.y * HALO_DRIFT.y * 100).toFixed(3)}vh)` }}
-            >
-                <div className="mustry-idle-halo__clock">
-                    <div className="mustry-idle-halo__time">{time}</div>
-                    <div className="mustry-idle-halo__date">{day}</div>
-                    {c.title.trim() !== '' && <div className="mustry-idle-halo__title">{c.title}</div>}
-                </div>
-                {lines.map((line, i) => {
-                    const r = radii[i] * 100;
-                    return (
-                        <div
-                            key={i}
-                            className="mustry-idle-halo__label"
-                            style={{ left: `calc(50% + ${(cos * r).toFixed(2)}vmin)`, top: `calc(50% - ${(sin * r).toFixed(2)}vmin)` }}
-                        >
-                            <span className="mustry-idle-halo__name">{line.label || `Line ${i + 1}`}</span>
-                            <span className="mustry-idle-halo__state" style={{ color: pipeColor(line.state, line.color) }}>{line.state}</span>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }
-
-    private renderBanner(v: AlarmVerdict, style: React.CSSProperties): React.ReactNode {
-        const p = this.props.props;
-        const feed = this.props.delegate ? this.props.delegate.feed : null;
-        const total = PRIORITIES.reduce((n, pr, i) => (i >= p.alarm.pinPriority ? n + v.counted[pr] : n), 0);
-        const first = feed && feed.top.length > 0 ? feed.top[0] : null;
-        return (
-            <div className={`mustry-idle-banner mustry-idle-banner--${PRIORITIES[Math.max(0, v.highest)]}`} style={style} role="alert">
-                <span className="mustry-idle-banner__count">{plural(total, 'active alarm')}</span>
-                <span className="mustry-idle-banner__detail">{countsText(v.counted, p.alarm.pinPriority)}</span>
-                {first && <span className="mustry-idle-banner__first">{first.label || first.displayPath}</span>}
-            </div>
-        );
-    }
-}
-
-interface CanvasModeProps {
-    mode: Mode;
-    props: GuardProps;
-}
-
-interface CanvasModeState {
-    /** WebGL2 failed (or lost its context): draw the 2D version on a fresh canvas. */
-    fallback: boolean;
-}
-
-/** A full-viewport canvas running one mode's renderer at up to 30 fps. */
-class CanvasMode extends React.Component<CanvasModeProps, CanvasModeState> {
-    private canvas: HTMLCanvasElement | null = null;
-    private loop: FrameLoop | null = null;
-    private renderer: ModeRenderer | null = null;
-
-    constructor(props: CanvasModeProps) {
-        super(props);
-        this.state = { fallback: false };
-    }
-
-    componentDidMount(): void {
-        this.start();
-    }
-
-    componentDidUpdate(prev: CanvasModeProps, prevState: CanvasModeState): void {
-        if (prevState.fallback !== this.state.fallback || prev.mode !== this.props.mode
-            || prev.props.config.quality !== this.props.props.config.quality) {
-            this.stop();
-            this.start();
-        } else if (prev.props !== this.props.props && this.renderer) {
-            this.renderer.configure(this.props.props);
-        }
-    }
-
-    componentWillUnmount(): void {
-        this.stop();
-    }
-
-    private start(): void {
-        const canvas = this.canvas;
-        if (!canvas) {
-            return;
-        }
-        let renderer: ModeRenderer | null = null;
-        if (!this.state.fallback && GL_MODES.includes(this.props.mode)) {
-            renderer = createGLRenderer(this.props.mode, canvas, this.props.props.config.quality);
-            if (!renderer) {
-                // The canvas may now hold a half-made GL context: re-render with a new one.
-                this.setState({ fallback: true });
-                return;
-            }
-        } else {
-            renderer = create2DRenderer(this.props.mode, canvas);
-        }
-        this.renderer = renderer;
-        canvas.dataset.renderer = renderer.kind;
-        renderer.configure(this.props.props);
-        this.loop = new FrameLoop((dt, now) => {
-            const r = this.renderer;
-            if (r instanceof GLMode && r.contextLost) {
-                this.stop();
-                this.setState({ fallback: true });
-                return;
-            }
-            if (r) {
-                r.frame(dt, now);
-            }
-        });
-        this.loop.start();
-    }
-
-    private stop(): void {
-        if (this.loop) {
-            this.loop.stop();
-            this.loop = null;
-        }
-        if (this.renderer) {
-            this.renderer.dispose();
-            this.renderer = null;
-        }
-    }
-
-    render() {
-        return (
-            <canvas
-                // A canvas that held a GL context cannot give a 2D one: new mode or fallback, new canvas.
-                key={`${this.props.mode}-${this.state.fallback ? '2d' : 'gl'}`}
-                className="mustry-idle-canvas"
-                ref={(c) => { this.canvas = c; }}
-            />
         );
     }
 }

@@ -24,7 +24,10 @@ function tree(obj: Record<string, unknown>): PropReader {
 describe('mapGuardProps', () => {
     it('applies schema defaults to an empty tree', () => {
         const p = mapGuardProps(tree({}));
-        expect(p.config).toEqual({ enabled: true, timeoutSec: 600, mode: 'pipes', wakeOnMove: true, moveThresholdPx: 8, wakeLock: false, quality: 'auto' });
+        expect(p.config).toEqual({
+            enabled: true, timeoutSec: 600, mode: 'clock', wakeOnMove: true, moveThresholdPx: 8, wakeLock: false, quality: 'auto', reduceMotion: 'auto'
+        });
+        expect(p.burnIn).toEqual({ drift: true, night: { enabled: true, from: '22:00', to: '06:00', mode: 'blank', level: 0.4 } });
         expect(p.alarm).toEqual({ wakePriority: 3, pinPriority: 2, includeAcked: true, sources: [], staleAfterSec: 8 });
         expect(p.lines).toBe(DEFAULT_LINES);
         expect(p.modes.legend).toBe(true);
@@ -57,8 +60,8 @@ describe('mapGuardProps', () => {
         expect(mapGuardProps(tree({ lines })).lines).toHaveLength(12);
     });
 
-    it('falls back to pipes for unknown modes', () => {
-        expect(normMode('toasters')).toBe('pipes');
+    it('falls back to the clock for unknown modes', () => {
+        expect(normMode('toasters')).toBe('clock');
         expect(normMode(' CLOCK ')).toBe('clock');
         expect(normMode('halo')).toBe('halo');
         expect(normMode('Shuffle')).toBe('shuffle');

@@ -1,3 +1,4 @@
+import { zoneWhereHourIs } from '../clockZone';
 import { clearAlarms, expect, guardStatus, litShare, OVERLAY, openGuarded, test, tile, waitIdle } from './helpers';
 
 // Every test runs in a fresh browser context (a fresh Perspective session).
@@ -306,4 +307,35 @@ test.describe('without WebGL2', () => {
             expect(warnings.some((w) => w.includes('WebGL2 unavailable'))).toBe(true);
         });
     }
+});
+
+test.describe('night window', () => {
+    // 1 a.m. in the browser: inside the default 22:00-06:00 window.
+    test.use({ timezoneId: zoneWhereHourIs(1) });
+
+    test('an idle screen rests at night: blank, nothing rendered, still wakes', async ({ page }) => {
+        await openGuarded(page, 'pipes', 5);
+        const overlay = await waitIdle(page);
+        await expect(overlay).toHaveAttribute('data-mode', 'blank');
+        await expect(overlay).toHaveAttribute('data-reason', 'night');
+        await expect(page.locator('.mustry-idle-canvas')).toHaveCount(0);
+        await page.waitForTimeout(1_500);
+        expect(await litShare(page, 30)).toBeLessThan(0.001);
+        await page.mouse.move(10, 10);
+        await page.mouse.move(300, 300, { steps: 3 });
+        await expect(page.locator(OVERLAY)).toHaveCount(0);
+    });
+});
+
+test.describe('reduced motion', () => {
+    test.use({ reducedMotion: 'reduce' });
+
+    test('animated modes give way to the clock when the browser asks for less motion', async ({ page }) => {
+        await openGuarded(page, 'flow', 5);
+        const overlay = await waitIdle(page);
+        await expect(overlay).toHaveAttribute('data-mode', 'clock');
+        await expect(overlay).toHaveAttribute('data-reason', 'reduced-motion');
+        await expect(page.locator('.mustry-idle-canvas')).toHaveCount(0);
+        await expect(page.locator('.mustry-idle-clock__time')).toBeVisible();
+    });
 });

@@ -1,5 +1,5 @@
 // Reads the Perspective PropertyTree into the typed props the Idle Guard uses.
-import { DimConfig, priorityIndex } from './idleLogic';
+import { NightConfig, normNightMode, normReduceMotion, priorityIndex, ReduceMotionSetting } from './idleLogic';
 import { normQuality, QualitySetting } from './modes/quality';
 
 /** The PropertyTree readers we use, kept structural so the mapper is node-testable. */
@@ -21,7 +21,7 @@ export type Mode = typeof MODES[number];
 
 export function normMode(value: string): Mode {
     const v = (value || '').trim().toLowerCase();
-    return (MODES as readonly string[]).includes(v) ? v as Mode : 'pipes';
+    return (MODES as readonly string[]).includes(v) ? v as Mode : 'clock';
 }
 
 /** Modes drawn on a canvas by a renderer (the rest are plain DOM). Also what shuffle picks from. */
@@ -52,6 +52,7 @@ export interface GuardProps {
         moveThresholdPx: number;
         wakeLock: boolean;
         quality: QualitySetting;
+        reduceMotion: ReduceMotionSetting;
     };
     alarm: {
         wakePriority: number;
@@ -62,7 +63,7 @@ export interface GuardProps {
     };
     burnIn: {
         drift: boolean;
-        dim: DimConfig;
+        night: NightConfig;
     };
     lines: LineSpec[];
     modes: {
@@ -112,11 +113,12 @@ export function mapGuardProps(tree: PropReader): GuardProps {
         config: {
             enabled: tree.readBoolean('config.enabled', true),
             timeoutSec: Number(tree.readNumber('config.timeoutSec', 600)),
-            mode: normMode(tree.readString('config.mode', 'pipes')),
+            mode: normMode(tree.readString('config.mode', 'clock')),
             wakeOnMove: tree.readBoolean('config.wakeOnMove', true),
             moveThresholdPx: Number(tree.readNumber('config.moveThresholdPx', 8)),
             wakeLock: tree.readBoolean('config.wakeLock', false),
-            quality: normQuality(tree.readString('config.quality', 'auto'))
+            quality: normQuality(tree.readString('config.quality', 'auto')),
+            reduceMotion: normReduceMotion(tree.readString('config.reduceMotion', 'auto'))
         },
         alarm: {
             wakePriority: wake,
@@ -127,11 +129,12 @@ export function mapGuardProps(tree: PropReader): GuardProps {
         },
         burnIn: {
             drift: tree.readBoolean('burnIn.drift', true),
-            dim: {
-                enabled: tree.readBoolean('burnIn.dim.enabled', false),
-                from: tree.readString('burnIn.dim.from', '22:00'),
-                to: tree.readString('burnIn.dim.to', '06:00'),
-                level: Number(tree.readNumber('burnIn.dim.level', 0.4))
+            night: {
+                enabled: tree.readBoolean('burnIn.night.enabled', true),
+                from: tree.readString('burnIn.night.from', '22:00'),
+                to: tree.readString('burnIn.night.to', '06:00'),
+                mode: normNightMode(tree.readString('burnIn.night.mode', 'blank')),
+                level: Number(tree.readNumber('burnIn.night.level', 0.4))
             }
         },
         lines: readLines(tree),

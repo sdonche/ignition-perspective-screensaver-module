@@ -38,8 +38,8 @@
             "blank",
             "external"
           ],
-          "default": "pipes",
-          "description": "What covers the page when idle. Driven by 'lines': pipes, aurora, halo; starfield follows modes.starfield. Showpieces, not linked to the plant: synthwave, lava, tunnel, flow. Funny: bounce, pong, ducks. 'shuffle' rotates through the animated modes (see modes.shuffle). clock and blank are plain. 'external' draws nothing: the project reacts to output.idle or onIdle/onWake itself."
+          "default": "clock",
+          "description": "What covers the page when idle. The default, clock, uses no graphics card at all. Driven by 'lines': pipes, aurora, halo; starfield follows modes.starfield. Showpieces, not linked to the plant: synthwave, lava, tunnel, flow. Funny: bounce, pong, ducks. 'shuffle' rotates through the animated modes (see modes.shuffle). clock and blank are plain. 'external' draws nothing: the project reacts to output.idle or onIdle/onWake itself."
         },
         "wakeOnMove": {
           "type": "boolean",
@@ -66,6 +66,16 @@
           ],
           "default": "auto",
           "description": "How hard the animated modes work the graphics card. 'auto' starts high and steps down when the screen cannot keep 20 frames a second (a Raspberry Pi kiosk, an old NUC). Browsers without WebGL2 get simpler 2D versions."
+        },
+        "reduceMotion": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "default": "auto",
+          "description": "For viewers who are sensitive to motion: the animated modes are replaced by the clock. 'auto' follows the browser's 'reduce motion' setting (prefers-reduced-motion), 'always' forces it (a kiosk without that setting), 'never' ignores it."
         }
       }
     },
@@ -106,7 +116,7 @@
         "sources": {
           "type": "array",
           "default": [],
-          "description": "Only alarms whose display path or source path matches one of these patterns count. '*' matches anything, e.g. 'prov:default:/tag:Line1/*' or 'Line 1*'. Empty = every alarm on the gateway.",
+          "description": "Only alarms whose display path or source path matches one of these patterns count. '*' matches anything, e.g. 'prov:default:/tag:Line1/*' or 'Line 1*'. Empty = every alarm on the gateway. The matching alarms' labels and display paths are sent to this browser for the banner, whoever is logged in (or nobody): on a public or lobby screen, limit them here.",
           "items": {
             "type": "string"
           }
@@ -129,14 +139,14 @@
           "default": true,
           "description": "Text in the idle modes (clock, legends, banners) wanders slowly so nothing stays on the same pixels."
         },
-        "dim": {
+        "night": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Dim the screen while idle during a daily time window. Lifted while an alarm at or above pinPriority is active.",
+          "description": "The night window: while idle inside it the screen rests, which saves power and panel life. 'blank' renders nothing (the default), 'clock' shows the plain clock, 'dim' keeps the configured mode dimmed to 'level'. Alarms behave as always: a wake alarm wakes the page, a pinned one shows its banner (and lifts the dimming).",
           "properties": {
             "enabled": {
               "type": "boolean",
-              "default": false
+              "default": true
             },
             "from": {
               "type": "string",
@@ -148,12 +158,22 @@
               "default": "06:00",
               "description": "End of the window, HH:MM. May be earlier than 'from' (the window crosses midnight)."
             },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "blank",
+                "clock",
+                "dim"
+              ],
+              "default": "blank",
+              "description": "What the idle screen shows inside the window."
+            },
             "level": {
               "type": "number",
               "default": 0.4,
               "minimum": 0,
               "maximum": 1,
-              "description": "Brightness inside the window: 1 = no dimming, 0 = black."
+              "description": "Brightness for the 'dim' night mode: 1 = no dimming, 0 = black."
             }
           }
         }

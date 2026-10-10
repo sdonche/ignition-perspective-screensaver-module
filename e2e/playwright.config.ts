@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { zoneWhereHourIs } from './clockZone';
 
 // Where the dev gateway is published. Matches GATEWAY_HTTP_PORT in ../.env
 // (ops/e2e.sh exports E2E_BASE_URL from the same source of truth).
@@ -15,6 +16,8 @@ export default defineConfig({
     use: {
         baseURL,
         viewport: { width: 1280, height: 760 },
+        // Midday in the browser, so the default night window (22:00-06:00) never kicks in by accident.
+        timezoneId: zoneWhereHourIs(13),
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
         launchOptions: {

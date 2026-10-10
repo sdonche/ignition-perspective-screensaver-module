@@ -1,5 +1,6 @@
 import {
-    AlarmFeed, AlarmPolicy, countsText, CRITICAL, dimLevel, drift, evaluateAlarms, initialState, input, inWindow,
+    AlarmFeed, AlarmPolicy, countsText, CRITICAL, dimLevel, drift, evaluateAlarms, initialState, input, inWindow, isNight,
+    NightConfig, normNightMode, normReduceMotion, wantsReducedMotion,
     movedEnough, parseClock, parseFeed, priorityIndex, tick, timeoutMs, zeroCounts
 } from '../components/guard/idleLogic';
 
@@ -167,7 +168,7 @@ describe('pointer jitter', () => {
     });
 });
 
-describe('dim schedule', () => {
+describe('night window', () => {
     it('parses HH:MM', () => {
         expect(parseClock('22:00')).toBe(1320);
         expect(parseClock('6:05')).toBe(365);
@@ -184,16 +185,35 @@ describe('dim schedule', () => {
         expect(inWindow(9 * 60, 480, 480)).toBe(false);
     });
 
-    it('dims inside the window unless an alarm is pinned', () => {
-        const cfg = { enabled: true, from: '22:00', to: '06:00', level: 0.4 };
-        const night = new Date(2026, 9, 10, 23, 30);
-        const day = new Date(2026, 9, 10, 14, 0);
-        expect(dimLevel(cfg, night, false)).toBe(0.4);
-        expect(dimLevel(cfg, night, true)).toBe(1);
-        expect(dimLevel(cfg, day, false)).toBe(1);
-        expect(dimLevel({ ...cfg, enabled: false }, night, false)).toBe(1);
-        expect(dimLevel({ ...cfg, level: -2 }, night, false)).toBe(0);
-        expect(dimLevel({ ...cfg, from: 'x' }, night, false)).toBe(1);
+    const night = new Date(2026, 9, 10, 23, 30);
+    const day = new Date(2026, 9, 10, 14, 0);
+    const NIGHT: NightConfig = { enabled: true, from: '22:00', to: '06:00', mode: 'dim', level: 0.4 };
+
+    it('knows when it is night', () => {
+        expect(isNight(NIGHT, night)).toBe(true);
+        expect(isNight(NIGHT, day)).toBe(false);
+        expect(isNight({ ...NIGHT, enabled: false }, night)).toBe(false);
+        expect(isNight({ ...NIGHT, from: 'x' }, night)).toBe(false);
+    });
+
+    it('dims only in dim mode, inside the window, unless an alarm is pinned', () => {
+        expect(dimLevel(NIGHT, night, false)).toBe(0.4);
+        expect(dimLevel(NIGHT, night, true)).toBe(1);
+        expect(dimLevel(NIGHT, day, false)).toBe(1);
+        expect(dimLevel({ ...NIGHT, enabled: false }, night, false)).toBe(1);
+        expect(dimLevel({ ...NIGHT, level: -2 }, night, false)).toBe(0);
+        expect(dimLevel({ ...NIGHT, mode: 'blank' }, night, false)).toBe(1);
+    });
+
+    it('normalises the night mode and the reduce-motion setting', () => {
+        expect(normNightMode('CLOCK')).toBe('clock');
+        expect(normNightMode('off')).toBe('blank');
+        expect(normReduceMotion(' Always ')).toBe('always');
+        expect(normReduceMotion('maybe')).toBe('auto');
+        expect(wantsReducedMotion('auto', true)).toBe(true);
+        expect(wantsReducedMotion('auto', false)).toBe(false);
+        expect(wantsReducedMotion('always', false)).toBe(true);
+        expect(wantsReducedMotion('never', true)).toBe(false);
     });
 });
 

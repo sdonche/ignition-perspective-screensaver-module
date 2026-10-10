@@ -26,9 +26,12 @@ there, not in the README.
 ## Layout
 
 - `web/typescript/components/guard/` — `idleLogic.ts` (pure, node-tested:
-  state machine, alarm policy, burn-in helpers), `guardProps.ts`
-  (PropertyTree → props), `guardDelegate.ts` (store delegate, feed parsing),
-  `IdleGuard.tsx` (the component), `modes/` (canvas renderers: `gl/` holds
+  state machine, alarm policy, night window, reduced motion, burn-in
+  helpers), `guardProps.ts` (PropertyTree → props), `guardDelegate.ts`
+  (store delegate, feed parsing), `IdleGuard.tsx` (the component: lifecycle,
+  input, state, outputs), `Cover.tsx` (what is shown while idle),
+  `CanvasMode.tsx` (canvas host), `modes/` (`modeToShow.ts` decides the
+  shown mode: night > shuffle > reduced motion; canvas renderers: `gl/` holds
   the WebGL2 modes and post-processing; `fun/` the 2D funny modes;
   `pipes.ts` / `starfield.ts` are the 2D fallbacks; every `*Sim.ts`,
   `quality.ts`, `lineStyle.ts`, `haloLayout.ts` and `shuffle.ts` are pure and
@@ -38,6 +41,9 @@ there, not in the README.
   the schema enum, and the e2e `CANVAS_MODES` table with a measured threshold.
 - Burn-in: nothing static may sit on the same pixels for hours. Text drifts
   (`drift()`), fixed layouts (pong's field) wander a little.
+- Defaults stay calm: `clock` by default, the night window on (blank). The
+  e2e suite pins the browser to a midday time zone (`e2e/clockZone.ts`) so the
+  window never interferes; the night test picks a 1 a.m. zone.
 - Visual work: `cd web && npm run preview`, open
   `web/build/preview/index.html#<mode>`; screenshot it headless rather than
   rebuilding the module each time. Then confirm on the gateway.
