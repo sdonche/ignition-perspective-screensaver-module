@@ -14,7 +14,10 @@ One component, the **Idle Guard** (`mustrysolutions.perspective.screensaver.idle
 | Outputs (`output.idle`, `idleSince`, `lastInput`, `mode`, `wakeCause`, `feedOk`, `alarms`) and events (`onIdle`, `onWake`) | Done |
 | Overlay in a `document.body` portal, page stays mounted | Done |
 | The waking gesture never reaches the page | Done, e2e-tested and mutation-checked |
-| Modes: pipes, aurora, halo, starfield (WebGL2), clock, blank, external | Done |
+| Line modes: pipes, aurora, halo; starfield (WebGL2) | Done |
+| Showpieces: synthwave, lava, tunnel, flow (WebGL2) | Done |
+| Funny: bounce, pong, ducks (2D, run everywhere) | Done |
+| Shuffle through the animated modes; clock, blank, external | Done |
 | 2D fallback for browsers without WebGL2; automatic quality steps for weak kiosks | Done |
 | Alarm policy: wake, pin banner, Critical always wakes, fail open on a stale feed | Done, unit- and e2e-tested |
 | Burn-in: drifting text, night dimming while idle | Done |
@@ -104,13 +107,14 @@ then; subscriptions are re-sent whenever `alarm.sources` changes.
 
 ### Idle modes and rendering
 
-Pipes, aurora, halo and starfield draw on a canvas through one interface
-(`modes/renderer.ts`: `configure(props)`, `frame(dt, now)`, `dispose()`).
-`modes/index.ts` builds the WebGL2 renderer; when the browser has no WebGL2 or
-a shader fails, `IdleGuard.tsx` re-mounts a fresh canvas with the 2D one
-(pipes has its own 2D drawing; the other three fall back to the 2D starfield).
-A lost GPU context does the same. The canvas carries `data-renderer` (`webgl2`
-or `2d`) so tests and people can see which one runs.
+The canvas modes draw through one interface (`modes/renderer.ts`:
+`configure(props)`, `frame(dt, now)`, `dispose()`). `modes/index.ts` builds
+them: the GL modes try WebGL2 first; when the browser has none or a shader
+fails, `IdleGuard.tsx` mounts a fresh canvas with the 2D version (pipes has its
+own; the other GL modes fall back to the 2D starfield). A lost GPU context
+does the same. The funny modes are 2D by design. The canvas is keyed by mode,
+because a canvas that held a GL context cannot give a 2D one (shuffle swaps
+between the two). It carries `data-renderer` (`webgl2` or `2d`).
 
 - **Pipes** (`gl/pipesGL.ts`): `PipesSim` grows one walker per line through a
   16 x 10 x 10 grid; the renderer draws instanced, lit tubes with ball joints
@@ -127,7 +131,28 @@ or `2d`) so tests and people can see which one runs.
 - **Starfield** (`gl/starfieldGL.ts`): instanced streaks, colour by
   temperature, length by speed, over a fbm nebula; tinted by `modes.starfield.color`.
 
-All four render into an HDR target (MSAA when allowed), then bloom, ACES tone
+- **Synthwave**, **Lava**, **Tunnel** (`gl/showpieces.ts`, one fragment
+  shader each on `gl/shaderMode.ts`): a retro sunset over a racing neon grid;
+  lava-lamp metaballs with glossy light, the wax colour drifting between
+  orange, magenta and teal over minutes; a bending neon wormhole.
+- **Flow** (`gl/flow.ts`): ~32k particles (12k at `low`) in a curl-noise field
+  of gradient noise (value noise leaves seams), moved by transform feedback so
+  no float textures are needed, painted into a ping-pong trail buffer that
+  fades each frame.
+- **Bounce** (`fun/bounce*.ts`): the bouncing badge (`modes.bounce.text`),
+  a new colour per bounce, confetti and "CORNER!" when it hits one exactly,
+  and a dim scoreboard of bounces and time since the last corner.
+- **Pong** (`fun/pong*.ts`): two AIs (`modes.pong.left` / `right`, default day
+  shift vs night shift) that aim for the predicted crossing with a per-rally
+  error, sometimes big enough to miss; first to 11; CRT scanlines; the field
+  drifts.
+- **Ducks** (`fun/ducks*.ts`): rubber ducks in hard hats and hi-vis vests on a
+  pool, one of them now and then saying something sensible.
+- **Shuffle** (`shuffle.ts`): a new mode every `modes.shuffle.minutes`
+  (minimum 0.5) from `modes.shuffle.modes` (empty = all), in an order shuffled
+  per idle session and cycled, so a mode never follows itself.
+
+The GL modes render into an HDR target (MSAA when allowed), then bloom, ACES tone
 mapping, vignette and dither (`gl/post.ts`). Line colours, glow and beacons come
 from `lineStyle.ts`, shared by all line modes.
 
@@ -168,7 +193,7 @@ The full schema with descriptions is
 |---|---|---|
 | `config.enabled` | true | Off wakes the page and stops detection |
 | `config.timeoutSec` | 600 | Minimum 5 |
-| `config.mode` | pipes | pipes, aurora, halo, starfield, clock, blank, external |
+| `config.mode` | pipes | pipes, aurora, halo, starfield, synthwave, lava, tunnel, flow, bounce, pong, ducks, shuffle, clock, blank, external |
 | `config.quality` | auto | auto, high, low (see Quality) |
 | `config.wakeOnMove` / `moveThresholdPx` | true / 8 | Mouse movement counts beyond the threshold |
 | `config.wakeLock` | false | Screen Wake Lock; HTTPS only |
@@ -184,6 +209,9 @@ The full schema with descriptions is
 | `modes.clock` | | `title` (also shown in halo), `showSeconds` |
 | `modes.starfield` | | `speed` (bind a line rate), `color`, `density`, `caption` |
 | `modes.pipes` | | `resetAfterSec` (120), `orbit` (true) |
+| `modes.bounce` | | `text` ("IDLE") |
+| `modes.pong` | | `left` ("DAY SHIFT"), `right` ("NIGHT SHIFT") |
+| `modes.shuffle` | | `modes` ([] = all animated), `minutes` (5, min 0.5) |
 
 Events: `onIdle {mode, idleSince}`, `onWake {cause, idleForMs}` with cause
 `input`, `alarm`, `feed-stale` or `disabled`.
@@ -220,7 +248,12 @@ What the e2e suite proves, on a real 8.3.6 gateway:
 - Critical wakes even with `wakePriority` Critical, and is never covered;
 - a silent feed (the suite drops its WebSocket messages) makes the guard fail
   open and stay away until the feed returns;
-- pipes, aurora, halo and starfield run on WebGL2 (not the fallback) and draw
-  their bright features (share of bright pixels, overlay text hidden); halo
-  labels each line; external mode draws nothing but reports idle;
+- all eleven canvas modes run on their renderer (WebGL2 or 2D) and draw
+  (share of bright pixels with the overlay text hidden, thresholds calibrated
+  against measured scenes and their dark backgrounds); halo labels each line;
+  clock shows the time; blank stays black; external draws nothing but reports idle;
+- with WebGL2 taken away, every GL mode falls back to 2D, draws, and warns
+  (never errors) in the console;
+- shuffle swaps lava (GL) and ducks (2D) back and forth on fresh canvases
+  (mutation-checked: with the canvas not keyed by mode, the swap draws nothing);
 - the browser console stays clean throughout.

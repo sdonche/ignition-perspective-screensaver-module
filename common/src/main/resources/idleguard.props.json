@@ -26,12 +26,20 @@
             "aurora",
             "halo",
             "starfield",
+            "synthwave",
+            "lava",
+            "tunnel",
+            "flow",
+            "bounce",
+            "pong",
+            "ducks",
+            "shuffle",
             "clock",
             "blank",
             "external"
           ],
           "default": "pipes",
-          "description": "What covers the page when idle. pipes, aurora and halo draw one element per entry of 'lines'; starfield follows modes.starfield; clock and blank are plain. 'external' draws nothing: the project reacts to output.idle or onIdle/onWake itself (navigate, open a popup)."
+          "description": "What covers the page when idle. Driven by 'lines': pipes, aurora, halo; starfield follows modes.starfield. Showpieces, not linked to the plant: synthwave, lava, tunnel, flow. Funny: bounce, pong, ducks. 'shuffle' rotates through the animated modes (see modes.shuffle). clock and blank are plain. 'external' draws nothing: the project reacts to output.idle or onIdle/onWake itself."
         },
         "wakeOnMove": {
           "type": "boolean",
@@ -271,6 +279,54 @@
               "type": "boolean",
               "default": true,
               "description": "The camera circles the scene slowly. Off: a fixed three-quarter view."
+            }
+          }
+        },
+        "bounce": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "type": "string",
+              "default": "IDLE",
+              "description": "What the bouncing badge says: a site or company name, a line name, anything short."
+            }
+          }
+        },
+        "pong": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "left": {
+              "type": "string",
+              "default": "DAY SHIFT",
+              "description": "Name of the left player."
+            },
+            "right": {
+              "type": "string",
+              "default": "NIGHT SHIFT",
+              "description": "Name of the right player."
+            }
+          }
+        },
+        "shuffle": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Settings for config.mode 'shuffle'.",
+          "properties": {
+            "modes": {
+              "type": "array",
+              "default": [],
+              "description": "The modes to rotate through, e.g. [\"pipes\", \"lava\", \"ducks\"]. Empty = every animated mode.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "minutes": {
+              "type": "number",
+              "default": 5,
+              "minimum": 0.5,
+              "description": "Minutes per mode before the next one fades in."
             }
           }
         }

@@ -119,6 +119,13 @@
           "modes": {
             "clock": {
               "title": "Packaging hall · shift B"
+            },
+            "shuffle": {
+              "modes": [
+                "lava",
+                "ducks"
+              ],
+              "minutes": 0.5
             }
           }
         },

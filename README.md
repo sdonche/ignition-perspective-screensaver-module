@@ -5,7 +5,10 @@
 An Ignition 8.3 Perspective module for screens nobody is touching. After a
 configurable idle time a Perspective page switches to 3D pipes, an aurora or a
 ring of neon dials, one per production line, coloured and moved by your tags.
-There are also a warp starfield running at line speed and a plain clock. Any touch, key or
+Or to something that has nothing to do with the plant: a synthwave sunset, a
+lava lamp, a neon tunnel, a particle flow field, the bouncing logo that never
+quite hits the corner, Pong between the day and the night shift, or rubber
+ducks in hard hats. Any touch, key or
 mouse movement wakes the page at once, and the tap that wakes it never presses
 the button underneath. An alarm wakes it too. It never covers an active
 critical alarm.
@@ -31,7 +34,7 @@ stations.
    `onWake`. The timeout and mode are props, so they can differ per page, role
    or display by binding.
 2. **Idle modes, driven by your lines.** Bind each line's state and flow to
-   tags (`lines[]`) and every mode shows them:
+   tags (`lines[]`) and these modes show them:
    - *Pipes*: glossy 3D pipes grow under a slowly orbiting camera, with light
      pulses running through them at the line's flow. A faulted line glows red
      and throbs.
@@ -39,21 +42,36 @@ stations.
      line in its state colour.
    - *Halo*: neon rings around a clock, a comet per ring orbiting at the line's flow.
    - *Starfield*: a warp flight through a nebula at your line rate.
-   - *Clock*, *Blank*, and *External* (draws nothing; your project reacts).
+3. **Showpieces, for screens that just need to look good.** *Synthwave* (a
+   retro sunset over a racing neon grid), *Lava* (a screen-sized lava lamp),
+   *Tunnel* (a bending neon wormhole), *Flow* (thirty thousand glowing
+   particles drifting through a curl-noise field).
+4. **Funny ones.** *Bounce* (your name on the bouncing badge; confetti when it
+   finally hits a corner), *Pong* (two AIs, day shift against night shift, to
+   11), *Ducks* (rubber ducks in hard hats and hi-vis vests reminding everyone
+   to hydrate).
+5. **Shuffle** rotates through any of them every few minutes. *Clock*,
+   *Blank*, and *External* (draws nothing; your project reacts) are there too.
 
    The animated modes use WebGL2 with bloom and step their quality down on
    weak kiosk hardware. Browsers without WebGL2 get simpler 2D versions.
-3. **Alarm-aware.** The gateway pushes active alarm counts to every guard. An
+6. **Alarm-aware, whatever is showing.** The gateway pushes active alarm counts to every guard. An
    alarm at or above a chosen priority wakes the screen and keeps it awake;
    lower ones pin a banner over the idle mode. An active critical alarm is
    never covered. If the guard cannot hear the gateway, it removes itself.
-4. **Burn-in care for 24/7 screens.** Text in the idle modes drifts slowly so
+7. **Burn-in care for 24/7 screens.** Text in the idle modes drifts slowly so
    nothing sits on the same pixels, and the screen can dim on a night schedule
    while idle (lifted by an alarm).
 
 | Aurora: one curtain per line | Halo: Line 1 in fault |
 |---|---|
 | ![Aurora mode](docs/images/aurora.png) | ![Halo mode](docs/images/halo.png) |
+| **Synthwave** | **Lava** |
+| ![Synthwave mode](docs/images/synthwave.png) | ![Lava mode](docs/images/lava.png) |
+| **Tunnel** | **Flow** |
+| ![Tunnel mode](docs/images/tunnel.png) | ![Flow mode](docs/images/flow.png) |
+| **Ducks** | **Pong: day shift vs night shift** |
+| ![Ducks mode](docs/images/ducks.png) | ![Pong mode](docs/images/pong.png) |
 | **A Medium alarm pinned over the pipes** | **Starfield at 160 units/min** |
 | ![Pipes mode with an alarm banner](docs/images/pipes-banner.png) | ![Starfield mode](docs/images/starfield.png) |
 
@@ -73,10 +91,11 @@ Perspective's own inactivity timeout and authentication.
 
 ## Status
 
-**v0.1, working prototype.** Built and tested on Ignition 8.3.6: 42 unit tests
-for the browser logic, 12 for the gateway alarm feed, and a 15-test Playwright
-suite against a real gateway (idle and wake, the swallowed waking tap, alarm
-wake, banner, Critical never covered, fail-open, every mode rendering on WebGL2).
+**v0.1, working prototype.** Built and tested on Ignition 8.3.6: unit tests
+for the browser logic and the gateway alarm feed, and a Playwright suite
+against a real gateway: idle and wake, the swallowed waking tap, alarm wake,
+banner, Critical never covered, fail-open, every mode drawing on its renderer,
+every GL mode falling back to 2D without WebGL2, and shuffle swapping modes.
 Not yet measured on real kiosk hardware (a Raspberry Pi, an old NUC): the
 quality governor is there for them, but nobody has watched it run on one.
 

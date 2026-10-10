@@ -29,9 +29,15 @@ there, not in the README.
   state machine, alarm policy, burn-in helpers), `guardProps.ts`
   (PropertyTree → props), `guardDelegate.ts` (store delegate, feed parsing),
   `IdleGuard.tsx` (the component), `modes/` (canvas renderers: `gl/` holds
-  the WebGL2 modes and post-processing; `pipes.ts` / `starfield.ts` are the
-  2D fallbacks; `pipesSim.ts`, `quality.ts`, `lineStyle.ts`, `haloLayout.ts`
-  are pure and tested).
+  the WebGL2 modes and post-processing; `fun/` the 2D funny modes;
+  `pipes.ts` / `starfield.ts` are the 2D fallbacks; every `*Sim.ts`,
+  `quality.ts`, `lineStyle.ts`, `haloLayout.ts` and `shuffle.ts` are pure and
+  tested).
+- A new canvas mode: add it to `MODES`, `CANVAS_MODES` (and `GL_MODES` if
+  it has a GL renderer) in `guardProps.ts`, the factory in `modes/index.ts`,
+  the schema enum, and the e2e `CANVAS_MODES` table with a measured threshold.
+- Burn-in: nothing static may sit on the same pixels for hours. Text drifts
+  (`drift()`), fixed layouts (pong's field) wander a little.
 - Visual work: `cd web && npm run preview`, open
   `web/build/preview/index.html#<mode>`; screenshot it headless rather than
   rebuilding the module each time. Then confirm on the gateway.

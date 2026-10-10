@@ -11,7 +11,7 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import { GuardDelegateState, GuardStoreDelegate } from './guardDelegate';
-import { CANVAS_MODES, GuardProps, mapGuardProps, MAX_LINES, Mode } from './guardProps';
+import { CANVAS_MODES, GL_MODES, GuardProps, mapGuardProps, MAX_LINES, Mode } from './guardProps';
 import { MAX_CURTAINS } from './modes/gl/aurora';
 import {
     AlarmPolicy, AlarmVerdict, countsText, dimLevel, drift, evaluateAlarms, IdleState, initialState, input,
@@ -20,6 +20,7 @@ import {
 import { FrameLoop } from './modes/frameLoop';
 import { HALO_DRIFT, HALO_LABEL_ANGLE, haloRadii } from './modes/haloLayout';
 import { create2DRenderer, createGLRenderer } from './modes/index';
+import { shufflePick } from './modes/shuffle';
 import { pipeColor } from './modes/pipesSim';
 import { GLMode, ModeRenderer } from './modes/renderer';
 
@@ -93,6 +94,8 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
     private written: Record<string, unknown> = {};
     private lastInputWritten = 0;
     private lastResubscribe = 0;
+    /** When the current cover went up (shuffle's clock). */
+    private coverSince = 0;
     /** The feed message the banner last rendered, so a new top alarm re-renders it. */
     private bannerSeq = -1;
     private wakeLock: { release(): Promise<void>; addEventListener(t: string, f: () => void): void } | null = null;
@@ -266,6 +269,7 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
         const t = result.transition;
         if (t !== null && t.type === 'idle') {
             this.moveAnchor = null;
+            this.coverSince = now;
             this.shielding = this.props.props.config.mode !== 'external';
             if (this.fadeTimer !== null) {
                 window.clearTimeout(this.fadeTimer);
@@ -397,7 +401,11 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
     private renderCover(): React.ReactNode {
         const p = this.props.props;
         const { fading, verdict, now } = this.state;
-        const mode: Mode = p.config.mode;
+        const shuffling = p.config.mode === 'shuffle';
+        // Shuffle keys off when this cover went up, which (unlike idleSince) holds through the fade-out.
+        const mode: Mode = shuffling
+            ? shufflePick(p.modes.shuffle.modes, this.coverSince, now, p.modes.shuffle.minutes)
+            : p.config.mode;
         const pinned = verdict !== null && verdict.pin;
         const dim = dimLevel(p.burnIn.dim, new Date(now), pinned);
         const dimLayer = dim < 1 ? <div className="mustry-idle-dim" style={{ opacity: (1 - dim).toFixed(3) }} /> : null;
@@ -410,12 +418,13 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
             <div
                 className={`mustry-idle-overlay mustry-idle-overlay--${mode}${fading ? ' mustry-idle-overlay--fading' : ''}`}
                 data-mode={mode}
+                data-shuffle={shuffling ? 'true' : undefined}
                 role="presentation"
             >
                 {CANVAS_MODES.includes(mode) && <CanvasMode mode={mode} props={p} />}
                 {mode === 'clock' && this.renderClock(now, driftStyle)}
                 {mode === 'halo' && this.renderHalo(now)}
-                {(mode === 'pipes' || mode === 'aurora') && p.modes.legend && this.renderLegend(driftStyle)}
+                {(mode === 'pipes' || mode === 'aurora') && p.modes.legend && this.renderLegend(mode, driftStyle)}
                 {mode === 'starfield' && p.modes.starfield.caption.trim() !== '' && (
                     <div className="mustry-idle-caption" style={driftStyle}>{p.modes.starfield.caption}</div>
                 )}
@@ -440,8 +449,8 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
         );
     }
 
-    private renderLegend(style: React.CSSProperties): React.ReactNode {
-        const lines = this.props.props.config.mode === 'aurora' ? this.props.props.lines.slice(0, MAX_CURTAINS) : this.props.props.lines;
+    private renderLegend(mode: Mode, style: React.CSSProperties): React.ReactNode {
+        const lines = mode === 'aurora' ? this.props.props.lines.slice(0, MAX_CURTAINS) : this.props.props.lines;
         return (
             <ul className="mustry-idle-legend" style={style}>
                 {lines.map((line, i) => (
@@ -554,7 +563,7 @@ class CanvasMode extends React.Component<CanvasModeProps, CanvasModeState> {
             return;
         }
         let renderer: ModeRenderer | null = null;
-        if (!this.state.fallback) {
+        if (!this.state.fallback && GL_MODES.includes(this.props.mode)) {
             renderer = createGLRenderer(this.props.mode, canvas, this.props.props.config.quality);
             if (!renderer) {
                 // The canvas may now hold a half-made GL context: re-render with a new one.
@@ -595,7 +604,8 @@ class CanvasMode extends React.Component<CanvasModeProps, CanvasModeState> {
     render() {
         return (
             <canvas
-                key={this.state.fallback ? '2d' : 'gl'}
+                // A canvas that held a GL context cannot give a 2D one: new mode or fallback, new canvas.
+                key={`${this.props.mode}-${this.state.fallback ? '2d' : 'gl'}`}
                 className="mustry-idle-canvas"
                 ref={(c) => { this.canvas = c; }}
             />

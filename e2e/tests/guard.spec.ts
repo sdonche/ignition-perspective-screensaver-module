@@ -185,21 +185,77 @@ test.describe('fail open', () => {
     });
 });
 
+/**
+ * Every canvas mode: its renderer, and the share of bright pixels it must beat (overlay text
+ * hidden). Measured on SwiftShader after 4 s; the thresholds sit well below that and well
+ * above the same scene's dark background (line modes measured with every line off).
+ * [mode, renderer, minimum share, brightness threshold (sum of R+G+B)]
+ */
+const CANVAS_MODES: Array<[string, 'webgl2' | '2d', number, number]> = [
+    ['pipes', 'webgl2', 0.01, 300],      // ~2.4 % (lines off: 0.00 %)
+    ['aurora', 'webgl2', 0.05, 300],     // ~14 % (lines off: 0.13 %)
+    ['halo', 'webgl2', 0.015, 300],      // ~4.6 % (lines off: 0.29 %)
+    ['starfield', 'webgl2', 0.002, 300], // ~0.5 %
+    ['synthwave', 'webgl2', 0.1, 300],   // ~45 %
+    ['lava', 'webgl2', 0.04, 300],       // ~17 %
+    ['tunnel', 'webgl2', 0.05, 300],     // ~19 %
+    ['flow', 'webgl2', 0.08, 100],       // ~29 % (its background sums to ~70)
+    ['bounce', '2d', 0.002, 300],        // ~0.6 %
+    ['pong', '2d', 0.005, 300],          // ~1.8 %
+    ['ducks', '2d', 0.2, 300]            // ~65 %
+];
+
 test.describe('modes', () => {
-    // Each animated mode must run on WebGL2 (not the 2D fallback) and draw its bright features.
-    // Share of bright pixels after 4 s on SwiftShader: pipes about 2.4 %, aurora 14 %, halo 4.6 %,
-    // starfield 0.5 %. The same scenes with every line off (background only): pipes 0.00 %,
-    // halo 0.29 %, aurora 0.13 %. The thresholds sit between the two.
-    for (const [mode, minLit] of [['pipes', 0.01], ['aurora', 0.05], ['halo', 0.015], ['starfield', 0.002]] as const) {
-        test(`${mode} renders with WebGL2`, async ({ page }) => {
+    for (const [mode, renderer, minLit, brightness] of CANVAS_MODES) {
+        test(`${mode} renders (${renderer})`, async ({ page }) => {
             await openGuarded(page, mode, 5);
-            await waitIdle(page);
-            const canvas = page.locator('.mustry-idle-canvas');
-            await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
+            const overlay = await waitIdle(page);
+            await expect(overlay).toHaveAttribute('data-mode', mode);
+            await expect(page.locator('.mustry-idle-canvas')).toHaveAttribute('data-renderer', renderer);
             await page.waitForTimeout(4_000);
-            expect(await litShare(page)).toBeGreaterThan(minLit);
+            expect(await litShare(page, brightness)).toBeGreaterThan(minLit);
         });
     }
+
+    // The verify guard shuffles lava (WebGL2) and ducks (2D) every 30 s: each swap needs a
+    // fresh canvas, since one that held a GL context cannot give a 2D one.
+    test('shuffle swaps between GL and 2D modes on fresh canvases', async ({ page }) => {
+        test.setTimeout(150_000);
+        await openGuarded(page, 'shuffle', 5);
+        const overlay = await waitIdle(page);
+        await expect(overlay).toHaveAttribute('data-shuffle', 'true');
+        const first = await overlay.getAttribute('data-mode');
+        expect(['lava', 'ducks']).toContain(first);
+        const second = first === 'lava' ? 'ducks' : 'lava';
+        const renderer = (m: string) => (m === 'lava' ? 'webgl2' : '2d');
+        await expect(page.locator('.mustry-idle-canvas')).toHaveAttribute('data-renderer', renderer(first as string));
+        for (const next of [second, first as string]) {
+            await expect(overlay).toHaveAttribute('data-mode', next, { timeout: 40_000 });
+            const canvas = page.locator('.mustry-idle-canvas');
+            await expect(canvas).toHaveCount(1);
+            await expect(canvas).toHaveAttribute('data-renderer', renderer(next));
+            await page.waitForTimeout(3_000);
+            expect(await litShare(page)).toBeGreaterThan(next === 'lava' ? 0.04 : 0.2);
+        }
+    });
+
+    test('clock shows the time', async ({ page }) => {
+        await openGuarded(page, 'clock', 5);
+        await waitIdle(page);
+        await expect(page.locator('.mustry-idle-clock__time')).toHaveText(/\d{1,2}:\d{2}/);
+        await expect(page.locator('.mustry-idle-canvas')).toHaveCount(0);
+    });
+
+    // A fresh session per mode: the verify page sets the guard's mode once per session.
+    test('blank shows nothing at all', async ({ page }) => {
+        await openGuarded(page, 'blank', 5);
+        const overlay = await waitIdle(page);
+        await expect(overlay).toHaveAttribute('data-mode', 'blank');
+        await expect(page.locator('.mustry-idle-hint')).toHaveCount(0);
+        // Past the 600 ms fade-in: from then on, nothing but black.
+        await page.waitForTimeout(1_500);
+        expect(await litShare(page, 30)).toBeLessThan(0.001);
+    });
 
     test('halo labels each line around the clock', async ({ page }) => {
         await openGuarded(page, 'halo', 5);
@@ -219,4 +275,35 @@ test.describe('modes', () => {
         await page.mouse.move(400, 400, { steps: 3 });
         await expect(tile(page, 'screen')).toHaveText('awake');
     });
+});
+
+test.describe('without WebGL2', () => {
+    // A browser (or a locked-down kiosk) without WebGL2: every GL mode must fall back to 2D,
+    // still draw, and log no errors (the fallback announces itself with a console warning).
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript(() => {
+            const real = HTMLCanvasElement.prototype.getContext;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (HTMLCanvasElement.prototype as any).getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+                return type === 'webgl2' ? null : real.apply(this, [type, ...rest] as never);
+            };
+        });
+    });
+
+    for (const [mode] of CANVAS_MODES.filter(([, r]) => r === 'webgl2')) {
+        test(`${mode} falls back to 2D`, async ({ page }) => {
+            const warnings: string[] = [];
+            page.on('console', (m) => {
+                if (m.type() === 'warning') warnings.push(m.text());
+            });
+            await openGuarded(page, mode, 5);
+            const overlay = await waitIdle(page);
+            await expect(overlay).toHaveAttribute('data-mode', mode);
+            await expect(page.locator('.mustry-idle-canvas')).toHaveAttribute('data-renderer', '2d');
+            await page.waitForTimeout(4_000);
+            // The 2D starfield is sparse (~0.25 %); 2D pipes is denser.
+            expect(await litShare(page)).toBeGreaterThan(0.0008);
+            expect(warnings.some((w) => w.includes('WebGL2 unavailable'))).toBe(true);
+        });
+    }
 });

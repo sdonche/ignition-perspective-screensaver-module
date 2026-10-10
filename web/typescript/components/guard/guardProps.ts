@@ -11,7 +11,12 @@ export interface PropReader {
     readLength(path: string): number;
 }
 
-export const MODES = ['pipes', 'aurora', 'halo', 'starfield', 'clock', 'blank', 'external'] as const;
+export const MODES = [
+    'pipes', 'aurora', 'halo', 'starfield',          // driven by the plant
+    'synthwave', 'lava', 'tunnel', 'flow',           // showpieces
+    'bounce', 'pong', 'ducks',                       // funny
+    'shuffle', 'clock', 'blank', 'external'
+] as const;
 export type Mode = typeof MODES[number];
 
 export function normMode(value: string): Mode {
@@ -19,8 +24,13 @@ export function normMode(value: string): Mode {
     return (MODES as readonly string[]).includes(v) ? v as Mode : 'pipes';
 }
 
-/** Modes drawn on a canvas by a renderer (the rest are plain DOM). */
-export const CANVAS_MODES: readonly Mode[] = ['pipes', 'aurora', 'halo', 'starfield'];
+/** Modes drawn on a canvas by a renderer (the rest are plain DOM). Also what shuffle picks from. */
+export const CANVAS_MODES: readonly Mode[] = [
+    'pipes', 'aurora', 'halo', 'starfield', 'synthwave', 'lava', 'tunnel', 'flow', 'bounce', 'pong', 'ducks'
+];
+
+/** Canvas modes with a WebGL2 renderer; the others are 2D only (and run everywhere). */
+export const GL_MODES: readonly Mode[] = ['pipes', 'aurora', 'halo', 'starfield', 'synthwave', 'lava', 'tunnel', 'flow'];
 
 /** Modes that draw one element per entry of `lines`. */
 export const LINE_MODES: readonly Mode[] = ['pipes', 'aurora', 'halo'];
@@ -60,6 +70,9 @@ export interface GuardProps {
         clock: { title: string; showSeconds: boolean };
         starfield: { speed: number; color: string; density: number; caption: string };
         pipes: { resetAfterSec: number; orbit: boolean };
+        bounce: { text: string };
+        pong: { left: string; right: string };
+        shuffle: { modes: Mode[]; minutes: number };
     };
 }
 
@@ -137,6 +150,17 @@ export function mapGuardProps(tree: PropReader): GuardProps {
             pipes: {
                 resetAfterSec: Number(tree.readNumber('modes.pipes.resetAfterSec', 120)),
                 orbit: tree.readBoolean('modes.pipes.orbit', true)
+            },
+            bounce: { text: tree.readString('modes.bounce.text', 'IDLE') },
+            pong: {
+                left: tree.readString('modes.pong.left', 'DAY SHIFT'),
+                right: tree.readString('modes.pong.right', 'NIGHT SHIFT')
+            },
+            shuffle: {
+                modes: (tree.readArray('modes.shuffle.modes', []) || [])
+                    .map((m) => (typeof m === 'string' ? m.trim().toLowerCase() : ''))
+                    .filter((m): m is Mode => (CANVAS_MODES as readonly string[]).includes(m)),
+                minutes: Number(tree.readNumber('modes.shuffle.minutes', 5))
             }
         }
     };

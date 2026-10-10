@@ -29,6 +29,9 @@ describe('mapGuardProps', () => {
         expect(p.lines).toBe(DEFAULT_LINES);
         expect(p.modes.legend).toBe(true);
         expect(p.modes.pipes).toEqual({ resetAfterSec: 120, orbit: true });
+        expect(p.modes.bounce).toEqual({ text: 'IDLE' });
+        expect(p.modes.pong).toEqual({ left: 'DAY SHIFT', right: 'NIGHT SHIFT' });
+        expect(p.modes.shuffle).toEqual({ modes: [], minutes: 5 });
     });
 
     it('reads bound values', () => {
@@ -58,5 +61,12 @@ describe('mapGuardProps', () => {
         expect(normMode('toasters')).toBe('pipes');
         expect(normMode(' CLOCK ')).toBe('clock');
         expect(normMode('halo')).toBe('halo');
+        expect(normMode('Shuffle')).toBe('shuffle');
+        expect(normMode('ducks')).toBe('ducks');
+    });
+
+    it('reads the shuffle list, keeping only canvas modes', () => {
+        const p = mapGuardProps(tree({ modes: { shuffle: { modes: ['Lava', 'clock', 'nope', 'pong'], minutes: 2 } } }));
+        expect(p.modes.shuffle).toEqual({ modes: ['lava', 'pong'], minutes: 2 });
     });
 });

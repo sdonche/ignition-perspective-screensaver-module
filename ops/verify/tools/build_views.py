@@ -115,6 +115,9 @@ def guard_dock():
             ],
             "modes": {
                 "clock": {"title": "Packaging hall · shift B"},
+                # Shuffle alternates a GL and a 2D mode at the minimum period, so the e2e suite
+                # sees both canvas swaps (GL -> 2D and back) within a minute.
+                "shuffle": {"modes": ["lava", "ducks"], "minutes": 0.5},
             },
         },
         "propConfig": {

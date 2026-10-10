@@ -21,8 +21,11 @@ export function createGL(canvas: HTMLCanvasElement): WebGL2RenderingContext | nu
     }
 }
 
-/** Compile and link a program; throws with the driver's log so the caller can fall back to 2D. */
-export function program(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
+/**
+ * Compile and link a program; throws with the driver's log so the caller can fall back to 2D.
+ * `feedback` names vertex outputs captured by transform feedback (interleaved).
+ */
+export function program(gl: WebGL2RenderingContext, vs: string, fs: string, feedback?: string[]): WebGLProgram {
     const compile = (type: number, src: string): WebGLShader => {
         const s = gl.createShader(type) as WebGLShader;
         gl.shaderSource(s, src);
@@ -39,6 +42,9 @@ export function program(gl: WebGL2RenderingContext, vs: string, fs: string): Web
     const f = compile(gl.FRAGMENT_SHADER, fs);
     gl.attachShader(p, v);
     gl.attachShader(p, f);
+    if (feedback) {
+        gl.transformFeedbackVaryings(p, feedback, gl.INTERLEAVED_ATTRIBS);
+    }
     gl.linkProgram(p);
     gl.deleteShader(v);
     gl.deleteShader(f);

@@ -269,3 +269,8 @@ $z-top: 2147483000;
         letter-spacing: 0.12em;
     }
 }
+
+// Shuffle swaps one canvas for the next: let the new one fade in.
+.mustry-idle-canvas {
+    animation: mustry-idle-in 1.2s ease-out;
+}

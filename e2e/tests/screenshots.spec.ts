@@ -77,3 +77,15 @@ test('pipes with a pinned alarm', async ({ page }) => {
     await wake(page);
     await clearAlarms(page);
 });
+
+// The showpieces and the funny ones.
+for (const [mode, waitMs] of [['synthwave', 6_000], ['lava', 10_000], ['tunnel', 6_000], ['flow', 12_000],
+    ['ducks', 9_000], ['pong', 8_000], ['bounce', 6_000]] as const) {
+    test(mode, async ({ page }) => {
+        await openGuarded(page, mode, 5, 'High', 'high');
+        await clearAlarms(page);
+        await waitIdle(page);
+        await page.waitForTimeout(waitMs);
+        await page.screenshot({ path: `${OUT}/${mode}.png` });
+    });
+}
