@@ -1,0 +1,46 @@
+{
+  "pages": {
+    "/": {
+      "viewPath": "Overview",
+      "viewParams": {
+        "mode": "pipes",
+        "timeout": 30,
+        "wake": "High"
+      }
+    },
+    "/test/:mode/:timeout": {
+      "viewPath": "Overview",
+      "viewParams": {
+        "mode": "pipes",
+        "timeout": 30,
+        "wake": "High"
+      }
+    },
+    "/test/:mode/:timeout/:wake": {
+      "viewPath": "Overview",
+      "viewParams": {
+        "mode": "pipes",
+        "timeout": 30,
+        "wake": "High"
+      }
+    }
+  },
+  "sharedDocks": {
+    "top": [
+      {
+        "id": "guard",
+        "viewPath": "GuardDock",
+        "viewParams": {},
+        "size": 44,
+        "content": "push",
+        "show": "visible",
+        "handle": "hide",
+        "anchor": "fixed",
+        "resizable": false,
+        "modal": false,
+        "autoBreakpoint": 480,
+        "iconUrl": ""
+      }
+    ]
+  }
+}

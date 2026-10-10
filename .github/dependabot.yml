@@ -1,0 +1,57 @@
+# Dependabot: weekly, grouped, so the queue stays reviewable.
+#
+# Deliberately NOT managed here (bump by hand, together):
+# - The Ignition SDK (`sdk_version` in build.gradle.kts) and the
+#   `inductiveautomation/ignition` image in docker-compose.yml / CI track the
+#   gateway version the module is built and tested against.
+# - React 16: Perspective hosts components on React 16; a newer React breaks them.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "com.inductiveautomation.ignitionsdk:*"
+    groups:
+      gradle:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+      - dependency-name: "@types/react"
+        update-types: [version-update:semver-major]
+      - dependency-name: "@types/react-dom"
+        update-types: [version-update:semver-major]
+      # Follows the Node version pinned in web/build.gradle.kts, not npm's latest.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+    groups:
+      web:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+    groups:
+      e2e:
+        patterns: ["*"]
+        update-types: [minor, patch]
