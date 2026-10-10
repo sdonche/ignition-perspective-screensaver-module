@@ -3,13 +3,14 @@
 **A screensaver for Perspective that gets out of the way of every alarm.**
 
 An Ignition 8.3 Perspective module for screens nobody is touching. After a
-configurable idle time a Perspective page switches to a clock, a starfield
-running at line speed, or 3D pipes coloured by your tags. Any touch, key or
+configurable idle time a Perspective page switches to 3D pipes, an aurora or a
+ring of neon dials, one per production line, coloured and moved by your tags.
+There are also a warp starfield running at line speed and a plain clock. Any touch, key or
 mouse movement wakes the page at once, and the tap that wakes it never presses
 the button underneath. An alarm wakes it too. It never covers an active
 critical alarm.
 
-![Pipes mode: one pipe per line, coloured by its state tag](docs/images/pipes.png)
+![Pipes mode: one pipe per line, coloured by its state tag, with light pulses travelling at its flow](docs/images/pipes.png)
 
 The serious part is the reason to install it. Vision has
 `system.util.getInactivitySeconds()` and `system.security.lockScreen()`.
@@ -29,11 +30,19 @@ stations.
    props (`output.idle`, `output.idleSince`, ...) and fires `onIdle` /
    `onWake`. The timeout and mode are props, so they can differ per page, role
    or display by binding.
-2. **Idle modes.** *Starfield* (speed and colour bound to, say, line rate and
-   state), *Pipes* (one pipe per line: colour from its state tag, growth speed
-   from its flow), *Clock* (with a line or shift title), *Blank*, and
-   *External*, which draws nothing and leaves it to your project (navigate,
-   open a popup).
+2. **Idle modes, driven by your lines.** Bind each line's state and flow to
+   tags (`lines[]`) and every mode shows them:
+   - *Pipes*: glossy 3D pipes grow under a slowly orbiting camera, with light
+     pulses running through them at the line's flow. A faulted line glows red
+     and throbs.
+   - *Aurora*: northern lights over mountains and a still lake, one curtain per
+     line in its state colour.
+   - *Halo*: neon rings around a clock, a comet per ring orbiting at the line's flow.
+   - *Starfield*: a warp flight through a nebula at your line rate.
+   - *Clock*, *Blank*, and *External* (draws nothing; your project reacts).
+
+   The animated modes use WebGL2 with bloom and step their quality down on
+   weak kiosk hardware. Browsers without WebGL2 get simpler 2D versions.
 3. **Alarm-aware.** The gateway pushes active alarm counts to every guard. An
    alarm at or above a chosen priority wakes the screen and keeps it awake;
    lower ones pin a banner over the idle mode. An active critical alarm is
@@ -42,9 +51,11 @@ stations.
    nothing sits on the same pixels, and the screen can dim on a night schedule
    while idle (lifted by an alarm).
 
-| Clock with a pinned Medium alarm | Starfield at 160 units/min |
+| Aurora: one curtain per line | Halo: Line 1 in fault |
 |---|---|
-| ![Clock mode with an alarm banner](docs/images/clock-banner.png) | ![Starfield mode](docs/images/starfield.png) |
+| ![Aurora mode](docs/images/aurora.png) | ![Halo mode](docs/images/halo.png) |
+| **A Medium alarm pinned over the pipes** | **Starfield at 160 units/min** |
+| ![Pipes mode with an alarm banner](docs/images/pipes-banner.png) | ![Starfield mode](docs/images/starfield.png) |
 
 **Not a lock.** The guard is a browser overlay, not an access control: anyone
 with the browser's developer tools can remove it. For access control use
@@ -56,15 +67,18 @@ Perspective's own inactivity timeout and authentication.
 2. Drop one **Idle Guard** (palette: *Mustry Solutions*) into a view in a
    **shared dock**, so it is on every page and survives navigation. It is
    invisible in sessions; in the Designer it shows as a small chip.
-3. Set `config.timeoutSec` and `config.mode`, and bind `modes.*` to your tags.
+3. Set `config.timeoutSec` and `config.mode`, and bind `lines[]` (and
+   `modes.*`) to your tags.
    The [reference](docs/reference.md#props) lists every prop.
 
 ## Status
 
-**v0.1, working prototype.** Built and tested on Ignition 8.3.6: 32 unit tests
-for the browser logic, 12 for the gateway alarm feed, and a 12-test Playwright
+**v0.1, working prototype.** Built and tested on Ignition 8.3.6: 42 unit tests
+for the browser logic, 12 for the gateway alarm feed, and a 15-test Playwright
 suite against a real gateway (idle and wake, the swallowed waking tap, alarm
-wake, banner, Critical never covered, fail-open, the modes).
+wake, banner, Critical never covered, fail-open, every mode rendering on WebGL2).
+Not yet measured on real kiosk hardware (a Raspberry Pi, an old NUC): the
+quality governor is there for them, but nobody has watched it run on one.
 
 Planned, not built: an Andon board component, a rotation of your own views, a
 privacy lock with re-authentication, page-level pixel orbit, a `[Screensaver]`

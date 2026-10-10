@@ -11,15 +11,17 @@ import {
     Size2d
 } from '@inductiveautomation/perspective-client';
 import { GuardDelegateState, GuardStoreDelegate } from './guardDelegate';
-import { GuardProps, mapGuardProps, Mode } from './guardProps';
+import { CANVAS_MODES, GuardProps, mapGuardProps, MAX_LINES, Mode } from './guardProps';
+import { MAX_CURTAINS } from './modes/gl/aurora';
 import {
     AlarmPolicy, AlarmVerdict, countsText, dimLevel, drift, evaluateAlarms, IdleState, initialState, input,
     movedEnough, plural, Point, PRIORITIES, StepResult, tick, timeoutMs, WakeCause
 } from './idleLogic';
 import { FrameLoop } from './modes/frameLoop';
-import { PipesRenderer } from './modes/pipes';
+import { HALO_DRIFT, HALO_LABEL_ANGLE, haloRadii } from './modes/haloLayout';
+import { create2DRenderer, createGLRenderer } from './modes/index';
 import { pipeColor } from './modes/pipesSim';
-import { Starfield } from './modes/starfield';
+import { GLMode, ModeRenderer } from './modes/renderer';
 
 // Must match IdleGuard.COMPONENT_ID on the Java side.
 export const COMPONENT_TYPE = 'mustrysolutions.perspective.screensaver.idleguard';
@@ -410,10 +412,10 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
                 data-mode={mode}
                 role="presentation"
             >
-                {mode === 'starfield' && <CanvasMode kind="starfield" props={p} />}
-                {mode === 'pipes' && <CanvasMode kind="pipes" props={p} />}
+                {CANVAS_MODES.includes(mode) && <CanvasMode mode={mode} props={p} />}
                 {mode === 'clock' && this.renderClock(now, driftStyle)}
-                {mode === 'pipes' && p.modes.pipes.legend && this.renderLegend(driftStyle)}
+                {mode === 'halo' && this.renderHalo(now)}
+                {(mode === 'pipes' || mode === 'aurora') && p.modes.legend && this.renderLegend(driftStyle)}
                 {mode === 'starfield' && p.modes.starfield.caption.trim() !== '' && (
                     <div className="mustry-idle-caption" style={driftStyle}>{p.modes.starfield.caption}</div>
                 )}
@@ -439,16 +441,56 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
     }
 
     private renderLegend(style: React.CSSProperties): React.ReactNode {
+        const lines = this.props.props.config.mode === 'aurora' ? this.props.props.lines.slice(0, MAX_CURTAINS) : this.props.props.lines;
         return (
             <ul className="mustry-idle-legend" style={style}>
-                {this.props.props.modes.pipes.pipes.map((pipe, i) => (
+                {lines.map((line, i) => (
                     <li key={i} className="mustry-idle-legend__item">
-                        <span className="mustry-idle-legend__dot" style={{ background: pipeColor(pipe.state, pipe.color) }} />
-                        <span className="mustry-idle-legend__label">{pipe.label || `Pipe ${i + 1}`}</span>
-                        <span className="mustry-idle-legend__state">{pipe.state}</span>
+                        <span className="mustry-idle-legend__dot" style={{ background: pipeColor(line.state, line.color) }} />
+                        <span className="mustry-idle-legend__label">{line.label || `Line ${i + 1}`}</span>
+                        <span className="mustry-idle-legend__state">{line.state}</span>
                     </li>
                 ))}
             </ul>
+        );
+    }
+
+    /** Halo's DOM half: the clock in the middle and a label beside each ring, drifting with the shader's centre. */
+    private renderHalo(now: number): React.ReactNode {
+        const p = this.props.props;
+        const c = p.modes.clock;
+        const d = p.burnIn.drift ? drift(now) : { x: 0, y: 0 };
+        const date = new Date(now);
+        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const day = date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+        const lines = p.lines.slice(0, MAX_LINES);
+        const radii = haloRadii(lines.length);
+        const cos = Math.cos(HALO_LABEL_ANGLE);
+        const sin = Math.sin(HALO_LABEL_ANGLE);
+        return (
+            <div
+                className="mustry-idle-halo"
+                style={{ transform: `translate(${(d.x * HALO_DRIFT.x * 100).toFixed(3)}vw, ${(d.y * HALO_DRIFT.y * 100).toFixed(3)}vh)` }}
+            >
+                <div className="mustry-idle-halo__clock">
+                    <div className="mustry-idle-halo__time">{time}</div>
+                    <div className="mustry-idle-halo__date">{day}</div>
+                    {c.title.trim() !== '' && <div className="mustry-idle-halo__title">{c.title}</div>}
+                </div>
+                {lines.map((line, i) => {
+                    const r = radii[i] * 100;
+                    return (
+                        <div
+                            key={i}
+                            className="mustry-idle-halo__label"
+                            style={{ left: `calc(50% + ${(cos * r).toFixed(2)}vmin)`, top: `calc(50% - ${(sin * r).toFixed(2)}vmin)` }}
+                        >
+                            <span className="mustry-idle-halo__name">{line.label || `Line ${i + 1}`}</span>
+                            <span className="mustry-idle-halo__state" style={{ color: pipeColor(line.state, line.color) }}>{line.state}</span>
+                        </div>
+                    );
+                })}
+            </div>
         );
     }
 
@@ -468,62 +510,96 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
 }
 
 interface CanvasModeProps {
-    kind: 'starfield' | 'pipes';
+    mode: Mode;
     props: GuardProps;
 }
 
-/** A full-viewport canvas running one renderer at up to 30 fps. */
-class CanvasMode extends React.Component<CanvasModeProps> {
+interface CanvasModeState {
+    /** WebGL2 failed (or lost its context): draw the 2D version on a fresh canvas. */
+    fallback: boolean;
+}
+
+/** A full-viewport canvas running one mode's renderer at up to 30 fps. */
+class CanvasMode extends React.Component<CanvasModeProps, CanvasModeState> {
     private canvas: HTMLCanvasElement | null = null;
     private loop: FrameLoop | null = null;
-    private starfield: Starfield | null = null;
-    private pipes: PipesRenderer | null = null;
+    private renderer: ModeRenderer | null = null;
+
+    constructor(props: CanvasModeProps) {
+        super(props);
+        this.state = { fallback: false };
+    }
 
     componentDidMount(): void {
-        if (!this.canvas) {
+        this.start();
+    }
+
+    componentDidUpdate(prev: CanvasModeProps, prevState: CanvasModeState): void {
+        if (prevState.fallback !== this.state.fallback || prev.mode !== this.props.mode
+            || prev.props.config.quality !== this.props.props.config.quality) {
+            this.stop();
+            this.start();
+        } else if (prev.props !== this.props.props && this.renderer) {
+            this.renderer.configure(this.props.props);
+        }
+    }
+
+    componentWillUnmount(): void {
+        this.stop();
+    }
+
+    private start(): void {
+        const canvas = this.canvas;
+        if (!canvas) {
             return;
         }
-        if (this.props.kind === 'starfield') {
-            this.starfield = new Starfield(this.canvas);
+        let renderer: ModeRenderer | null = null;
+        if (!this.state.fallback) {
+            renderer = createGLRenderer(this.props.mode, canvas, this.props.props.config.quality);
+            if (!renderer) {
+                // The canvas may now hold a half-made GL context: re-render with a new one.
+                this.setState({ fallback: true });
+                return;
+            }
         } else {
-            this.pipes = new PipesRenderer(this.canvas);
+            renderer = create2DRenderer(this.props.mode, canvas);
         }
-        this.configure();
+        this.renderer = renderer;
+        canvas.dataset.renderer = renderer.kind;
+        renderer.configure(this.props.props);
         this.loop = new FrameLoop((dt, now) => {
-            if (this.starfield) {
-                this.starfield.frame(dt);
-            } else if (this.pipes) {
-                this.pipes.frame(dt, now);
+            const r = this.renderer;
+            if (r instanceof GLMode && r.contextLost) {
+                this.stop();
+                this.setState({ fallback: true });
+                return;
+            }
+            if (r) {
+                r.frame(dt, now);
             }
         });
         this.loop.start();
     }
 
-    componentDidUpdate(prev: CanvasModeProps): void {
-        if (prev.props.modes !== this.props.props.modes) {
-            this.configure();
-        }
-    }
-
-    componentWillUnmount(): void {
+    private stop(): void {
         if (this.loop) {
             this.loop.stop();
             this.loop = null;
         }
-    }
-
-    private configure(): void {
-        const m = this.props.props.modes;
-        if (this.starfield) {
-            this.starfield.configure(m.starfield);
-        }
-        if (this.pipes) {
-            this.pipes.configure(m.pipes.pipes, m.pipes.resetAfterSec);
+        if (this.renderer) {
+            this.renderer.dispose();
+            this.renderer = null;
         }
     }
 
     render() {
-        return <canvas className="mustry-idle-canvas" ref={(c) => { this.canvas = c; }} />;
+        return (
+            <canvas
+                key={this.state.fallback ? '2d' : 'gl'}
+                className="mustry-idle-canvas"
+                ref={(c) => { this.canvas = c; }}
+            />
+        );
     }
 }
 

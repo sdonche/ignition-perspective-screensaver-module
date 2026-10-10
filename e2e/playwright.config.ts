@@ -19,7 +19,9 @@ export default defineConfig({
         screenshot: 'only-on-failure',
         launchOptions: {
             // A pre-installed Chromium (e.g. a container without `playwright install`).
-            executablePath: process.env.PW_CHROMIUM_PATH || undefined
+            executablePath: process.env.PW_CHROMIUM_PATH || undefined,
+            // CI runners have no GPU: WebGL2 runs on SwiftShader, which Chrome only allows when asked.
+            args: ['--enable-unsafe-swiftshader']
         }
     },
 });

@@ -1,5 +1,6 @@
 // Reads the Perspective PropertyTree into the typed props the Idle Guard uses.
 import { DimConfig, priorityIndex } from './idleLogic';
+import { normQuality, QualitySetting } from './modes/quality';
 
 /** The PropertyTree readers we use, kept structural so the mapper is node-testable. */
 export interface PropReader {
@@ -10,15 +11,22 @@ export interface PropReader {
     readLength(path: string): number;
 }
 
-export const MODES = ['starfield', 'pipes', 'clock', 'blank', 'external'] as const;
+export const MODES = ['pipes', 'aurora', 'halo', 'starfield', 'clock', 'blank', 'external'] as const;
 export type Mode = typeof MODES[number];
 
 export function normMode(value: string): Mode {
     const v = (value || '').trim().toLowerCase();
-    return (MODES as readonly string[]).includes(v) ? v as Mode : 'starfield';
+    return (MODES as readonly string[]).includes(v) ? v as Mode : 'pipes';
 }
 
-export interface PipeSpec {
+/** Modes drawn on a canvas by a renderer (the rest are plain DOM). */
+export const CANVAS_MODES: readonly Mode[] = ['pipes', 'aurora', 'halo', 'starfield'];
+
+/** Modes that draw one element per entry of `lines`. */
+export const LINE_MODES: readonly Mode[] = ['pipes', 'aurora', 'halo'];
+
+/** One production line (or utility, or unit) as the line-driven modes show it. */
+export interface LineSpec {
     label: string;
     state: string;
     flow: number;
@@ -33,6 +41,7 @@ export interface GuardProps {
         wakeOnMove: boolean;
         moveThresholdPx: number;
         wakeLock: boolean;
+        quality: QualitySetting;
     };
     alarm: {
         wakePriority: number;
@@ -45,34 +54,35 @@ export interface GuardProps {
         drift: boolean;
         dim: DimConfig;
     };
+    lines: LineSpec[];
     modes: {
+        legend: boolean;
         clock: { title: string; showSeconds: boolean };
         starfield: { speed: number; color: string; density: number; caption: string };
-        pipes: { pipes: PipeSpec[]; legend: boolean; resetAfterSec: number };
+        pipes: { resetAfterSec: number; orbit: boolean };
     };
 }
 
-/** The default pipe set, so a freshly dropped guard in pipes mode shows something. */
-export const DEFAULT_PIPES: PipeSpec[] = [
+/** The demo set, so a freshly dropped guard in a line mode shows something. */
+export const DEFAULT_LINES: LineSpec[] = [
     { label: 'Line 1', state: 'running', flow: 0.8, color: '' },
     { label: 'Line 2', state: 'running', flow: 0.5, color: '' },
     { label: 'CIP', state: 'idle', flow: 0.2, color: '' },
     { label: 'Utilities', state: 'warning', flow: 0.6, color: '' }
 ];
 
-/** At most this many pipes grow at once; more only crowd the grid. */
-export const MAX_PIPES = 12;
+/** At most this many lines are drawn; more only crowd the screen. */
+export const MAX_LINES = 12;
 
-/** modes.pipes.pipes, item by item. Empty means the demo set: a pipes screensaver without pipes is a black screen. */
-function readPipes(tree: PropReader): PipeSpec[] {
-    const base = 'modes.pipes.pipes';
-    const n = Math.min(tree.readLength(base), MAX_PIPES);
+/** `lines`, item by item. Empty means the demo set: a line mode without lines is a black screen. */
+function readLines(tree: PropReader): LineSpec[] {
+    const n = Math.min(tree.readLength('lines'), MAX_LINES);
     if (n === 0) {
-        return DEFAULT_PIPES;
+        return DEFAULT_LINES;
     }
-    const out: PipeSpec[] = [];
+    const out: LineSpec[] = [];
     for (let i = 0; i < n; i++) {
-        const p = `${base}[${i}]`;
+        const p = `lines[${i}]`;
         out.push({
             label: tree.readString(`${p}.label`, ''),
             state: tree.readString(`${p}.state`, 'running'),
@@ -89,10 +99,11 @@ export function mapGuardProps(tree: PropReader): GuardProps {
         config: {
             enabled: tree.readBoolean('config.enabled', true),
             timeoutSec: Number(tree.readNumber('config.timeoutSec', 600)),
-            mode: normMode(tree.readString('config.mode', 'starfield')),
+            mode: normMode(tree.readString('config.mode', 'pipes')),
             wakeOnMove: tree.readBoolean('config.wakeOnMove', true),
             moveThresholdPx: Number(tree.readNumber('config.moveThresholdPx', 8)),
-            wakeLock: tree.readBoolean('config.wakeLock', false)
+            wakeLock: tree.readBoolean('config.wakeLock', false),
+            quality: normQuality(tree.readString('config.quality', 'auto'))
         },
         alarm: {
             wakePriority: wake,
@@ -110,7 +121,9 @@ export function mapGuardProps(tree: PropReader): GuardProps {
                 level: Number(tree.readNumber('burnIn.dim.level', 0.4))
             }
         },
+        lines: readLines(tree),
         modes: {
+            legend: tree.readBoolean('modes.legend', true),
             clock: {
                 title: tree.readString('modes.clock.title', ''),
                 showSeconds: tree.readBoolean('modes.clock.showSeconds', false)
@@ -122,9 +135,8 @@ export function mapGuardProps(tree: PropReader): GuardProps {
                 caption: tree.readString('modes.starfield.caption', '')
             },
             pipes: {
-                pipes: readPipes(tree),
-                legend: tree.readBoolean('modes.pipes.legend', true),
-                resetAfterSec: Number(tree.readNumber('modes.pipes.resetAfterSec', 90))
+                resetAfterSec: Number(tree.readNumber('modes.pipes.resetAfterSec', 120)),
+                orbit: tree.readBoolean('modes.pipes.orbit', true)
             }
         }
     };

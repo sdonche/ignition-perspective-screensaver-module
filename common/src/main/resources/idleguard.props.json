@@ -21,9 +21,17 @@
         },
         "mode": {
           "type": "string",
-          "enum": ["starfield", "pipes", "clock", "blank", "external"],
-          "default": "starfield",
-          "description": "What covers the page when idle. 'external' draws nothing: the project reacts to output.idle or onIdle/onWake itself (navigate, open a popup)."
+          "enum": [
+            "pipes",
+            "aurora",
+            "halo",
+            "starfield",
+            "clock",
+            "blank",
+            "external"
+          ],
+          "default": "pipes",
+          "description": "What covers the page when idle. pipes, aurora and halo draw one element per entry of 'lines'; starfield follows modes.starfield; clock and blank are plain. 'external' draws nothing: the project reacts to output.idle or onIdle/onWake itself (navigate, open a popup)."
         },
         "wakeOnMove": {
           "type": "boolean",
@@ -40,6 +48,16 @@
           "type": "boolean",
           "default": false,
           "description": "Ask the browser to keep the display awake (Screen Wake Lock API). Only works over HTTPS."
+        },
+        "quality": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "high",
+            "low"
+          ],
+          "default": "auto",
+          "description": "How hard the animated modes work the graphics card. 'auto' starts high and steps down when the screen cannot keep 20 frames a second (a Raspberry Pi kiosk, an old NUC). Browsers without WebGL2 get simpler 2D versions."
         }
       }
     },
@@ -50,13 +68,25 @@
       "properties": {
         "wakePriority": {
           "type": "string",
-          "enum": ["Diagnostic", "Low", "Medium", "High", "Critical"],
+          "enum": [
+            "Diagnostic",
+            "Low",
+            "Medium",
+            "High",
+            "Critical"
+          ],
           "default": "High",
           "description": "Any active alarm at or above this priority wakes the page and keeps it awake while it is active. Critical always does."
         },
         "pinPriority": {
           "type": "string",
-          "enum": ["Diagnostic", "Low", "Medium", "High", "Critical"],
+          "enum": [
+            "Diagnostic",
+            "Low",
+            "Medium",
+            "High",
+            "Critical"
+          ],
           "default": "Medium",
           "description": "Active alarms at or above this priority (but below wakePriority) show as a banner over the idle mode."
         },
@@ -121,11 +151,68 @@
         }
       }
     },
+    "lines": {
+      "type": "array",
+      "description": "Your lines, units or utilities: one pipe, aurora curtain or halo ring each (up to 12). Bind state and flow to tags: the colour follows the state, the motion follows the flow. Empty = a demo set.",
+      "default": [
+        {
+          "label": "Line 1",
+          "state": "running",
+          "flow": 0.8
+        },
+        {
+          "label": "Line 2",
+          "state": "running",
+          "flow": 0.5
+        },
+        {
+          "label": "CIP",
+          "state": "idle",
+          "flow": 0.2
+        },
+        {
+          "label": "Utilities",
+          "state": "warning",
+          "flow": 0.6
+        }
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "default": ""
+          },
+          "state": {
+            "type": "string",
+            "default": "running",
+            "description": "running, idle, warning, fault or off. Picks the colour unless 'color' is set; fault also pulses."
+          },
+          "flow": {
+            "type": "number",
+            "default": 0.5,
+            "minimum": 0,
+            "description": "0 = still; 1 = full speed (values above 1 go faster, up to 3). Drives pipe growth and flow pulses, aurora motion and halo spin."
+          },
+          "color": {
+            "type": "string",
+            "default": "",
+            "description": "Override colour (any CSS colour)."
+          }
+        }
+      }
+    },
     "modes": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Settings per idle mode. Bind them to tags to make the screensaver show the plant.",
+      "description": "Settings per idle mode. The line-driven modes (pipes, aurora, halo) read 'lines'.",
       "properties": {
+        "legend": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the line labels and states over the pipes and aurora modes (halo labels its rings itself)."
+        },
         "clock": {
           "type": "object",
           "additionalProperties": false,
@@ -174,52 +261,16 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "pipes": {
-              "type": "array",
-              "description": "One pipe per entry (up to 12), grown in a 3D grid. Bind state and flow to tags: the colour follows the state, the growth speed follows the flow. Empty = a demo set.",
-              "default": [
-                { "label": "Line 1", "state": "running", "flow": 0.8 },
-                { "label": "Line 2", "state": "running", "flow": 0.5 },
-                { "label": "CIP", "state": "idle", "flow": 0.2 },
-                { "label": "Utilities", "state": "warning", "flow": 0.6 }
-              ],
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "label": {
-                    "type": "string",
-                    "default": ""
-                  },
-                  "state": {
-                    "type": "string",
-                    "default": "running",
-                    "description": "running, idle, warning, fault or off. Picks the colour unless 'color' is set."
-                  },
-                  "flow": {
-                    "type": "number",
-                    "default": 0.5,
-                    "minimum": 0,
-                    "description": "0 = the pipe stops growing; 1 = full speed (values above 1 go faster, up to 3)."
-                  },
-                  "color": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Override colour (any CSS colour)."
-                  }
-                }
-              }
-            },
-            "legend": {
-              "type": "boolean",
-              "default": true,
-              "description": "Show the pipe labels and states."
-            },
             "resetAfterSec": {
               "type": "number",
-              "default": 90,
+              "default": 120,
               "minimum": 10,
               "description": "Start over with an empty scene after this long."
+            },
+            "orbit": {
+              "type": "boolean",
+              "default": true,
+              "description": "The camera circles the scene slowly. Off: a fixed three-quarter view."
             }
           }
         }

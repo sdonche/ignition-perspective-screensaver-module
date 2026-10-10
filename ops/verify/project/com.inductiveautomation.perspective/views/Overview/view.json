@@ -6,7 +6,8 @@
   "params": {
     "mode": "pipes",
     "timeout": 30,
-    "wake": "High"
+    "wake": "High",
+    "quality": "auto"
   },
   "props": {
     "defaultSize": {
@@ -32,6 +33,10 @@
     "params.wake": {
       "paramDirection": "input",
       "persistent": true
+    },
+    "params.quality": {
+      "paramDirection": "input",
+      "persistent": true
     }
   },
   "root": {
@@ -51,7 +56,7 @@
           "type": "script",
           "scope": "G",
           "config": {
-            "script": "\tscreensaver.setupTags()\n\tself.session.custom.guard = {'mode': self.view.params.mode, 'timeout': self.view.params.timeout, 'wake': self.view.params.wake}\n\t# The guard's onIdle/onWake events overwrite this; set here so bindings never see a missing path.\n\tself.session.custom.screensaver = {'idle': False, 'mode': '', 'cause': ''}"
+            "script": "\tscreensaver.setupTags()\n\tself.session.custom.guard = {'mode': self.view.params.mode, 'timeout': self.view.params.timeout, 'wake': self.view.params.wake, 'quality': self.view.params.quality}\n\t# The guard's onIdle/onWake events overwrite this; set here so bindings never see a missing path.\n\tself.session.custom.screensaver = {'idle': False, 'mode': '', 'cause': ''}"
           }
         }
       }

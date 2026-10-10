@@ -1,4 +1,4 @@
-import { clearAlarms, expect, guardStatus, OVERLAY, openGuarded, test, tile, waitIdle } from './helpers';
+import { clearAlarms, expect, guardStatus, litShare, OVERLAY, openGuarded, test, tile, waitIdle } from './helpers';
 
 // Every test runs in a fresh browser context (a fresh Perspective session).
 // Alarms are gateway-wide, so the alarm tests clear them first and last.
@@ -186,28 +186,29 @@ test.describe('fail open', () => {
 });
 
 test.describe('modes', () => {
-    for (const mode of ['starfield', 'pipes'] as const) {
-        test(`${mode} draws on its canvas`, async ({ page }) => {
+    // Each animated mode must run on WebGL2 (not the 2D fallback) and draw its bright features.
+    // Share of bright pixels after 4 s on SwiftShader: pipes about 2.4 %, aurora 14 %, halo 4.6 %,
+    // starfield 0.5 %. The same scenes with every line off (background only): pipes 0.00 %,
+    // halo 0.29 %, aurora 0.13 %. The thresholds sit between the two.
+    for (const [mode, minLit] of [['pipes', 0.01], ['aurora', 0.05], ['halo', 0.015], ['starfield', 0.002]] as const) {
+        test(`${mode} renders with WebGL2`, async ({ page }) => {
             await openGuarded(page, mode, 5);
             await waitIdle(page);
-            await page.waitForTimeout(2_500);
-            const lit = await page.locator('.mustry-idle-canvas').evaluate((c: HTMLCanvasElement) => {
-                const ctx = c.getContext('2d');
-                if (!ctx || c.width === 0) {
-                    return 0;
-                }
-                const data = ctx.getImageData(0, 0, c.width, c.height).data;
-                let n = 0;
-                for (let i = 0; i < data.length; i += 4 * 16) {
-                    if (data[i] + data[i + 1] + data[i + 2] > 120) {
-                        n++;
-                    }
-                }
-                return n;
-            });
-            expect(lit).toBeGreaterThan(20);
+            const canvas = page.locator('.mustry-idle-canvas');
+            await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
+            await page.waitForTimeout(4_000);
+            expect(await litShare(page)).toBeGreaterThan(minLit);
         });
     }
+
+    test('halo labels each line around the clock', async ({ page }) => {
+        await openGuarded(page, 'halo', 5);
+        await waitIdle(page);
+        const labels = page.locator('.mustry-idle-halo__label');
+        await expect(labels).toHaveCount(5);
+        await expect(labels.first()).toContainText('Line 1');
+        await expect(page.locator('.mustry-idle-halo__time')).toBeVisible();
+    });
 
     test('external mode draws nothing but still reports idle', async ({ page }) => {
         await openGuarded(page, 'external', 5);

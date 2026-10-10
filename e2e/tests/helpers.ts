@@ -1,4 +1,5 @@
 import { test as base, expect, Locator, Page } from '@playwright/test';
+import { PNG } from 'pngjs';
 
 /** Session-relative route of the committed "verify" Perspective project. */
 const SESSION = '/data/perspective/client/verify';
@@ -33,8 +34,8 @@ export { expect };
  * connected and the guard is in its dock. Detects the Perspective
  * trial-expired screen and fails with instructions.
  */
-export async function openGuarded(page: Page, mode: string, timeoutSec: number, wake?: string): Promise<void> {
-    const route = `/test/${mode}/${timeoutSec}${wake ? `/${wake}` : ''}`;
+export async function openGuarded(page: Page, mode: string, timeoutSec: number, wake?: string, quality?: string): Promise<void> {
+    const route = `/test/${mode}/${timeoutSec}${wake || quality ? `/${wake || 'High'}` : ''}${quality ? `/${quality}` : ''}`;
     await page.goto(`${SESSION}${route}`);
     const heading = page.getByText('Packaging hall · overview');
     const trial = page.getByText('Trial Expired');
@@ -68,4 +69,27 @@ export async function waitIdle(page: Page, timeoutMs = 15_000): Promise<Locator>
 /** Clear every demo alarm (a button click: it is input, so call it before waiting for idle). */
 export async function clearAlarms(page: Page): Promise<void> {
     await page.getByRole('button', { name: 'Clear all alarms' }).click();
+}
+
+/**
+ * Share of sampled screen pixels brighter than `threshold` (sum of R+G+B),
+ * from a screenshot with the overlay's text hidden, so only the canvas counts.
+ */
+export async function litShare(page: Page, threshold = 300): Promise<number> {
+    const style = await page.addStyleTag({ content: '.mustry-idle-overlay > :not(canvas) { visibility: hidden !important; }' });
+    const shot = await page.screenshot();
+    await style.evaluate((el) => el.remove());
+    const png = PNG.sync.read(shot);
+    let lit = 0;
+    let seen = 0;
+    for (let y = 0; y < png.height; y += 6) {
+        for (let x = 0; x < png.width; x += 6) {
+            const i = (y * png.width + x) * 4;
+            seen++;
+            if (png.data[i] + png.data[i + 1] + png.data[i + 2] > threshold) {
+                lit++;
+            }
+        }
+    }
+    return lit / seen;
 }

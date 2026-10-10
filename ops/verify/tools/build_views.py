@@ -106,16 +106,15 @@ def guard_dock():
         "position": {"basis": "220px", "shrink": 0},
         "props": {
             "config": {"timeoutSec": 600, "mode": "pipes"},
+            "lines": [
+                {"label": "Line 1", "state": "running", "flow": 0.8},
+                {"label": "Line 2", "state": "running", "flow": 0.5},
+                {"label": "CIP", "state": "idle", "flow": 0.2},
+                {"label": "Utilities", "state": "warning", "flow": 0.6},
+                {"label": "Palletiser", "state": "running", "flow": 1.1},
+            ],
             "modes": {
                 "clock": {"title": "Packaging hall · shift B"},
-                "pipes": {
-                    "pipes": [
-                        {"label": "Line 1", "state": "running", "flow": 0.8},
-                        {"label": "Line 2", "state": "running", "flow": 0.5},
-                        {"label": "CIP", "state": "idle", "flow": 0.2},
-                        {"label": "Utilities", "state": "warning", "flow": 0.6},
-                    ]
-                },
             },
         },
         "propConfig": {
@@ -123,10 +122,11 @@ def guard_dock():
             "props.config.timeoutSec": expr("toInt(try({session.custom.guard.timeout}, 600), 600)"),
             "props.config.mode": expr("try({session.custom.guard.mode}, 'pipes')"),
             "props.alarm.wakePriority": expr("try({session.custom.guard.wake}, 'High')"),
+            "props.config.quality": expr("try({session.custom.guard.quality}, 'auto')"),
             "props.modes.starfield.speed": expr("try(tag('[default]Screensaver/LineRate'), 40) / 40.0"),
             "props.modes.starfield.caption": expr("'Line 1 · ' + numberFormat(try(tag('[default]Screensaver/LineRate'), 0), '0') + ' units/min'"),
-            "props.modes.pipes.pipes[0].state": expr("try(tag('[default]Screensaver/Line1State'), 'running')"),
-            "props.modes.pipes.pipes[0].flow": expr("try(tag('[default]Screensaver/LineRate'), 40) / 50.0"),
+            "props.lines[0].state": expr("try(tag('[default]Screensaver/Line1State'), 'running')"),
+            "props.lines[0].flow": expr("try(tag('[default]Screensaver/LineRate'), 40) / 50.0"),
         },
         "events": {
             "component": {
@@ -226,7 +226,7 @@ def overview():
 
     return {
         "custom": {"presses": 0, "releases": 0},
-        "params": {"mode": "pipes", "timeout": 30, "wake": "High"},
+        "params": {"mode": "pipes", "timeout": 30, "wake": "High", "quality": "auto"},
         "props": {"defaultSize": {"width": 1280, "height": 680}},
         "propConfig": {
             "custom.presses": {"persistent": True},
@@ -234,6 +234,7 @@ def overview():
             "params.mode": {"paramDirection": "input", "persistent": True},
             "params.timeout": {"paramDirection": "input", "persistent": True},
             "params.wake": {"paramDirection": "input", "persistent": True},
+            "params.quality": {"paramDirection": "input", "persistent": True},
         },
         "root": {
             "type": "ia.container.coord",
@@ -244,7 +245,7 @@ def overview():
                 "system": {
                     "onStartup": script(
                         "screensaver.setupTags()\n"
-                        "self.session.custom.guard = {'mode': self.view.params.mode, 'timeout': self.view.params.timeout, 'wake': self.view.params.wake}\n"
+                        "self.session.custom.guard = {'mode': self.view.params.mode, 'timeout': self.view.params.timeout, 'wake': self.view.params.wake, 'quality': self.view.params.quality}\n"
                         "# The guard's onIdle/onWake events overwrite this; set here so bindings never see a missing path.\n"
                         "self.session.custom.screensaver = {'idle': False, 'mode': '', 'cause': ''}"
                     )
@@ -256,7 +257,7 @@ def overview():
 
 
 def page_config():
-    params = {"mode": "pipes", "timeout": 30, "wake": "High"}
+    params = {"mode": "pipes", "timeout": 30, "wake": "High", "quality": "auto"}
     dock = {
         "id": "guard",
         "viewPath": "GuardDock",
@@ -276,6 +277,7 @@ def page_config():
             "/": {"viewPath": "Overview", "viewParams": params},
             "/test/:mode/:timeout": {"viewPath": "Overview", "viewParams": params},
             "/test/:mode/:timeout/:wake": {"viewPath": "Overview", "viewParams": params},
+            "/test/:mode/:timeout/:wake/:quality": {"viewPath": "Overview", "viewParams": params},
         },
         "sharedDocks": {"top": [dock]},
     }

@@ -5,7 +5,8 @@
       "viewParams": {
         "mode": "pipes",
         "timeout": 30,
-        "wake": "High"
+        "wake": "High",
+        "quality": "auto"
       }
     },
     "/test/:mode/:timeout": {
@@ -13,7 +14,8 @@
       "viewParams": {
         "mode": "pipes",
         "timeout": 30,
-        "wake": "High"
+        "wake": "High",
+        "quality": "auto"
       }
     },
     "/test/:mode/:timeout/:wake": {
@@ -21,7 +23,17 @@
       "viewParams": {
         "mode": "pipes",
         "timeout": 30,
-        "wake": "High"
+        "wake": "High",
+        "quality": "auto"
+      }
+    },
+    "/test/:mode/:timeout/:wake/:quality": {
+      "viewPath": "Overview",
+      "viewParams": {
+        "mode": "pipes",
+        "timeout": 30,
+        "wake": "High",
+        "quality": "auto"
       }
     }
   },

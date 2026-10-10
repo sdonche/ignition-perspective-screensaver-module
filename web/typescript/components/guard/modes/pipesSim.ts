@@ -12,6 +12,8 @@ export interface Segment {
     to: Vec3;
     /** A ball joint at `from`: the pipe turned or started there. */
     joint: boolean;
+    /** Distance along this run of pipe at `from`, in cells (flow pulses travel along it). */
+    dist: number;
 }
 
 export const DIRS: Vec3[] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
@@ -21,6 +23,8 @@ interface Walker {
     dir: number;
     /** The next segment starts with a joint. */
     turned: boolean;
+    /** Cells grown since this run spawned. */
+    dist: number;
 }
 
 /** Growth speed in cells per second at flow = 1. */
@@ -91,7 +95,7 @@ export class PipesSim {
             return null;
         }
         this.occupied.add(this.key(pos));
-        const w: Walker = { pos, dir: Math.floor(this.random() * DIRS.length), turned: true };
+        const w: Walker = { pos, dir: Math.floor(this.random() * DIRS.length), turned: true, dist: 0 };
         this.walkers[index] = w;
         return w;
     }
@@ -135,12 +139,13 @@ export class PipesSim {
         const joint = w.turned || dir !== w.dir;
         const d = DIRS[dir];
         const to: Vec3 = [w.pos[0] + d[0], w.pos[1] + d[1], w.pos[2] + d[2]];
-        const seg: Segment = { pipe: index, from: w.pos, to, joint };
+        const seg: Segment = { pipe: index, from: w.pos, to, joint, dist: w.dist };
         this.occupied.add(this.key(to));
         this.segments.push(seg);
         w.pos = to;
         w.dir = dir;
         w.turned = false;
+        w.dist += 1;
         return seg;
     }
 

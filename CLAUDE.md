@@ -28,8 +28,15 @@ there, not in the README.
 - `web/typescript/components/guard/` — `idleLogic.ts` (pure, node-tested:
   state machine, alarm policy, burn-in helpers), `guardProps.ts`
   (PropertyTree → props), `guardDelegate.ts` (store delegate, feed parsing),
-  `IdleGuard.tsx` (the component), `modes/` (canvas renderers; `pipesSim.ts`
-  is pure and tested).
+  `IdleGuard.tsx` (the component), `modes/` (canvas renderers: `gl/` holds
+  the WebGL2 modes and post-processing; `pipes.ts` / `starfield.ts` are the
+  2D fallbacks; `pipesSim.ts`, `quality.ts`, `lineStyle.ts`, `haloLayout.ts`
+  are pure and tested).
+- Visual work: `cd web && npm run preview`, open
+  `web/build/preview/index.html#<mode>`; screenshot it headless rather than
+  rebuilding the module each time. Then confirm on the gateway.
+- GL modes must keep working without WebGL2 (2D fallback) and must not log
+  console errors (the e2e fixture fails on them; a warning is fine).
 - `common/` descriptor + `idleguard.props.json` + event schemas; `gateway/`
   hook, `AlarmFeed` (one poller per gateway), `GuardModelDelegate`;
   `designer/` registers the palette entry.

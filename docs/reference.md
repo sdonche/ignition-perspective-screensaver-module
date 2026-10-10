@@ -14,7 +14,8 @@ One component, the **Idle Guard** (`mustrysolutions.perspective.screensaver.idle
 | Outputs (`output.idle`, `idleSince`, `lastInput`, `mode`, `wakeCause`, `feedOk`, `alarms`) and events (`onIdle`, `onWake`) | Done |
 | Overlay in a `document.body` portal, page stays mounted | Done |
 | The waking gesture never reaches the page | Done, e2e-tested and mutation-checked |
-| Modes: starfield, pipes, clock, blank, external | Done |
+| Modes: pipes, aurora, halo, starfield (WebGL2), clock, blank, external | Done |
+| 2D fallback for browsers without WebGL2; automatic quality steps for weak kiosks | Done |
 | Alarm policy: wake, pin banner, Critical always wakes, fail open on a stale feed | Done, unit- and e2e-tested |
 | Burn-in: drifting text, night dimming while idle | Done |
 | Screen Wake Lock (HTTPS only) | Done, not e2e-tested (the dev gateway is plain HTTP) |
@@ -68,8 +69,7 @@ Browser (Perspective client)                       Gateway
 - `guardDelegate.ts`: the store delegate; parses feed messages and stamps them
   with the **browser's** clock (staleness never compares two clocks).
 - `IdleGuard.tsx`: wires it together.
-- `modes/`: `pipesSim.ts` (pure, tested), `pipes.ts`, `starfield.ts` and
-  `frameLoop.ts` (canvas renderers, 30 fps cap, no work in hidden tabs).
+- `modes/`: the canvas modes. See [Idle modes and rendering](#idle-modes-and-rendering).
 
 **Input handling.** All listeners are on `window` in the capture phase, so
 they run before anything on the page. While the overlay is up, a pointer-down,
@@ -102,6 +102,47 @@ instance stays inert. Put it in a shared dock so it survives navigation.
 `timeoutSec` (minimum 5 s), so props from a previous view are long replaced by
 then; subscriptions are re-sent whenever `alarm.sources` changes.
 
+### Idle modes and rendering
+
+Pipes, aurora, halo and starfield draw on a canvas through one interface
+(`modes/renderer.ts`: `configure(props)`, `frame(dt, now)`, `dispose()`).
+`modes/index.ts` builds the WebGL2 renderer; when the browser has no WebGL2 or
+a shader fails, `IdleGuard.tsx` re-mounts a fresh canvas with the 2D one
+(pipes has its own 2D drawing; the other three fall back to the 2D starfield).
+A lost GPU context does the same. The canvas carries `data-renderer` (`webgl2`
+or `2d`) so tests and people can see which one runs.
+
+- **Pipes** (`gl/pipesGL.ts`): `PipesSim` grows one walker per line through a
+  16 x 10 x 10 grid; the renderer draws instanced, lit tubes with ball joints
+  and flanges, a floor grid and fog, from a camera orbiting every 150 s.
+  Segments grow smoothly. Bright pulses travel along each pipe at its flow
+  (`dist` along the run, a per-line phase); fault pipes throb. The scene fades
+  out and restarts at 30 % fill or `modes.pipes.resetAfterSec`.
+- **Aurora** (`gl/aurora.ts`): one fullscreen shader. One curtain per line (up
+  to six), coloured by state, folding with its flow; ridged-noise mountains;
+  the lake is the sky evaluated again, mirrored and rippled.
+- **Halo** (`gl/halo.ts`): one neon ring per line with two comets orbiting at
+  its flow, dial ticks, a clock in the middle. Ring radii and label angle come
+  from `haloLayout.ts`, shared with the DOM labels; both drift together.
+- **Starfield** (`gl/starfieldGL.ts`): instanced streaks, colour by
+  temperature, length by speed, over a fbm nebula; tinted by `modes.starfield.color`.
+
+All four render into an HDR target (MSAA when allowed), then bloom, ACES tone
+mapping, vignette and dither (`gl/post.ts`). Line colours, glow and beacons come
+from `lineStyle.ts`, shared by all line modes.
+
+**Quality.** `config.quality` `auto` (default) starts at full quality and the
+governor (`quality.ts`) steps down one level per 2-second window averaging
+under 20 fps: no MSAA, then 75 % resolution, then 60 % without bloom. It
+never steps back up, so it cannot oscillate. GL canvases are capped at
+DPR 1.5 and 2560 px wide. `high` and `low` pin a level. All modes run at up
+to 30 fps (a 24/7 wall does not need 60, and pays for it in power and heat).
+
+**Preview.** `cd web && npm run preview`, then open
+`web/build/preview/index.html#pipes` (or `#aurora`, `#halo`, `#starfield`;
+query `?quality=high&fault=1&lines=5&legacy=1`). It runs the renderers without
+Perspective, which is the fast loop for visual work. Not part of the module.
+
 ### Gateway
 
 - `AlarmFeed`: one daemon thread per gateway. Reads active, unshelved alarms
@@ -127,7 +168,8 @@ The full schema with descriptions is
 |---|---|---|
 | `config.enabled` | true | Off wakes the page and stops detection |
 | `config.timeoutSec` | 600 | Minimum 5 |
-| `config.mode` | starfield | starfield, pipes, clock, blank, external |
+| `config.mode` | pipes | pipes, aurora, halo, starfield, clock, blank, external |
+| `config.quality` | auto | auto, high, low (see Quality) |
 | `config.wakeOnMove` / `moveThresholdPx` | true / 8 | Mouse movement counts beyond the threshold |
 | `config.wakeLock` | false | Screen Wake Lock; HTTPS only |
 | `alarm.wakePriority` | High | Critical always wakes |
@@ -137,9 +179,11 @@ The full schema with descriptions is
 | `alarm.staleAfterSec` | 8 | Fail open after this much feed silence (min 3) |
 | `burnIn.drift` | true | Text wanders on a 7/11-minute Lissajous path |
 | `burnIn.dim` | off, 22:00–06:00, 0.4 | While idle; lifted by a pinned alarm |
-| `modes.clock` | | `title`, `showSeconds` |
+| `lines` | demo set | `[{label, state, flow, color}]`, max 12: one pipe, curtain (max 6) or ring each. state: running, idle, warning, fault, off |
+| `modes.legend` | true | Line legend over pipes and aurora |
+| `modes.clock` | | `title` (also shown in halo), `showSeconds` |
 | `modes.starfield` | | `speed` (bind a line rate), `color`, `density`, `caption` |
-| `modes.pipes` | demo set | `pipes[]` of `{label, state, flow, color}` (max 12), `legend`, `resetAfterSec` |
+| `modes.pipes` | | `resetAfterSec` (120), `orbit` (true) |
 
 Events: `onIdle {mode, idleSince}`, `onWake {cause, idleForMs}` with cause
 `input`, `alarm`, `feed-stale` or `disabled`.
@@ -160,8 +204,8 @@ Without `playwright install` (a container with its own Chromium), point the
 suite at it: `PW_CHROMIUM_PATH=/path/to/chrome ops/e2e.sh`.
 
 The demo page is `http://localhost:9388/data/perspective/client/verify`;
-`/test/<mode>/<timeoutSec>[/<wakePriority>]` picks the guard's config (the
-e2e suite uses those). The guard lives in the shared top dock (`GuardDock`),
+`/test/<mode>/<timeoutSec>[/<wakePriority>[/<quality>]]` picks the guard's
+config (the e2e suite uses those). The guard lives in the shared top dock (`GuardDock`),
 bound to `session.custom.guard`, which the page's view sets from its URL.
 
 What the e2e suite proves, on a real 8.3.6 gateway:
@@ -176,5 +220,7 @@ What the e2e suite proves, on a real 8.3.6 gateway:
 - Critical wakes even with `wakePriority` Critical, and is never covered;
 - a silent feed (the suite drops its WebSocket messages) makes the guard fail
   open and stay away until the feed returns;
-- starfield and pipes draw; external mode draws nothing but reports idle;
+- pipes, aurora, halo and starfield run on WebGL2 (not the fallback) and draw
+  their bright features (share of bright pixels, overlay text hidden); halo
+  labels each line; external mode draws nothing but reports idle;
 - the browser console stays clean throughout.

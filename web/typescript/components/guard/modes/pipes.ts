@@ -1,9 +1,10 @@
 // Pipes idle mode: draws the PipesSim scene as shaded tubes with ball joints,
 // in perspective, far segments first. One colour per configured pipe, from its
 // bound state; growth speed from its bound flow.
-import { PipeSpec } from '../guardProps';
+import { GuardProps, LineSpec } from '../guardProps';
 import { cssToRgb, fitCanvas, Rgb, shade } from './frameLoop';
 import { PipesSim, pipeColor, Segment, Vec3 } from './pipesSim';
+import { ModeRenderer } from './renderer';
 
 export const GRID: Vec3 = [16, 10, 10];
 
@@ -31,9 +32,11 @@ type Drawable =
     | { kind: 'tube'; depth: number; a: Projected; b: Projected; rgb: Rgb }
     | { kind: 'ball'; depth: number; p: Projected; rgb: Rgb };
 
-export class PipesRenderer {
+/** The 2D fallback for browsers without WebGL2 (see gl/pipesGL.ts for the real one). */
+export class PipesRenderer implements ModeRenderer {
+    readonly kind = '2d' as const;
     readonly sim: PipesSim;
-    private specs: PipeSpec[] = [];
+    private specs: LineSpec[] = [];
     private colors: Rgb[] = [];
     private dirty = true;
     private sceneStarted = Date.now();
@@ -45,7 +48,9 @@ export class PipesRenderer {
         this.sim = new PipesSim(GRID, random);
     }
 
-    configure(specs: PipeSpec[], resetAfterSec: number): void {
+    configure(props: GuardProps): void {
+        const specs = props.lines;
+        const resetAfterSec = props.modes.pipes.resetAfterSec;
         const colorsKey = JSON.stringify(specs.map((s) => [s.state, s.color]));
         const oldKey = JSON.stringify(this.specs.map((s) => [s.state, s.color]));
         if (specs.length !== this.specs.length) {
@@ -82,6 +87,10 @@ export class PipesRenderer {
             this.dirty = false;
             this.draw();
         }
+    }
+
+    dispose(): void {
+        // Nothing held beyond the canvas.
     }
 
     private project(p: Vec3, w: number, h: number): Projected {

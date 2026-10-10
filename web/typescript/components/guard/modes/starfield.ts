@@ -1,6 +1,8 @@
 // Starfield idle mode: flying through stars at a speed (and in a colour) that
 // can be bound to the plant, e.g. the line rate and the line state.
+import { GuardProps } from '../guardProps';
 import { cssToRgb, fitCanvas, Rgb } from './frameLoop';
+import { ModeRenderer } from './renderer';
 
 export interface StarfieldConfig {
     speed: number;
@@ -17,7 +19,9 @@ interface Star {
 
 const WHITE: Rgb = [255, 255, 255];
 
-export class Starfield {
+/** The 2D fallback for browsers without WebGL2 (see gl/starfieldGL.ts for the real one). */
+export class Starfield implements ModeRenderer {
+    readonly kind = '2d' as const;
     private stars: Star[] = [];
     private cfg: StarfieldConfig = { speed: 1, color: '', density: 400 };
     private rgb: Rgb = WHITE;
@@ -27,7 +31,8 @@ export class Starfield {
         this.ctx = canvas.getContext('2d');
     }
 
-    configure(cfg: StarfieldConfig): void {
+    configure(props: GuardProps): void {
+        const cfg: StarfieldConfig = props.modes.starfield;
         const density = Math.round(Math.min(3000, Math.max(50, Number.isFinite(cfg.density) ? cfg.density : 400)));
         if (density !== this.stars.length) {
             this.stars = Array.from({ length: density }, () => this.spawn(Math.random()));
@@ -40,6 +45,10 @@ export class Starfield {
 
     private spawn(z: number): Star {
         return { x: (Math.random() * 2 - 1), y: (Math.random() * 2 - 1), z, pz: z };
+    }
+
+    dispose(): void {
+        // Nothing held beyond the canvas.
     }
 
     frame(dtMs: number): void {
