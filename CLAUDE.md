@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+**Retired.** The Idle Guard moved into
+Mustry-Solutions/mustry-perspective-component-module (PR #208 there). Make
+changes there, not here.
+
 Ignition 8.3 Perspective module with ONE component: the Idle Guard, a
 screensaver for Perspective pages. Structure and conventions mirror Mustry Doom
 (Gradle + io.ia.sdk.modl, React 16 class component + TypeScript strict on the

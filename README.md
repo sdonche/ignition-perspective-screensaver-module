@@ -1,5 +1,13 @@
 # Mustry Screensaver (working name)
 
+> **This repository is retired.** The Idle Guard now lives in
+> [Mustry Perspective Components](https://github.com/Mustry-Solutions/mustry-perspective-component-module)
+> as its fifteenth component (moved in
+> [#208](https://github.com/Mustry-Solutions/mustry-perspective-component-module/pull/208)).
+> Development, issues and releases continue there. That version adds
+> translated labels, an alarm feed that only polls while a guard is on
+> screen, and fixes made since; this copy is kept read-only for its history.
+
 **A screensaver for Perspective that gets out of the way of every alarm.**
 
 An Ignition 8.3 Perspective module for screens nobody is touching. After a
