@@ -27,7 +27,7 @@ describe('mapGuardProps', () => {
         expect(p.config).toEqual({
             enabled: true, timeoutSec: 600, mode: 'clock', wakeOnMove: true, moveThresholdPx: 8, wakeLock: false, quality: 'auto', reduceMotion: 'auto'
         });
-        expect(p.burnIn).toEqual({ drift: true, night: { enabled: true, from: '22:00', to: '06:00', mode: 'blank', level: 0.4 } });
+        expect(p.burnIn).toEqual({ drift: true, night: { enabled: true, from: '22:00', to: '06:00', mode: 'clock', level: 0.4 } });
         expect(p.alarm).toEqual({ wakePriority: 3, pinPriority: 2, includeAcked: true, sources: [], staleAfterSec: 8 });
         expect(p.lines).toBe(DEFAULT_LINES);
         expect(p.modes.legend).toBe(true);

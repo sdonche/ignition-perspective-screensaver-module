@@ -20,7 +20,7 @@ One component, the **Idle Guard** (`mustrysolutions.perspective.screensaver.idle
 | Shuffle through the animated modes; clock, blank, external | Done |
 | 2D fallback for browsers without WebGL2; automatic quality steps for weak kiosks | Done |
 | Alarm policy: wake, pin banner, Critical always wakes, fail open on a stale feed | Done, unit- and e2e-tested |
-| Burn-in and power: drifting text, a night window (blank by default) | Done |
+| Burn-in and power: drifting text, a night window (dimmed clock by default) | Done |
 | Reduced motion: animated modes give way to the clock | Done |
 | Screen Wake Lock (HTTPS only) | Done, not e2e-tested (the dev gateway is plain HTTP) |
 | Designer: inert, shows a chip | Done |
@@ -42,10 +42,14 @@ Deliberate, following the review of the spec before building:
   gateway, instead of an `AlarmListener` per delegate. `AlarmManager.addListener`
   takes one source path, so a listener per guard would not cover "every alarm",
   and one query per tick costs the same whatever the number of displays.
-- **The night window applies only while idle**, and by default blanks the
-  screen rather than dimming it. The spec dims the wall on a schedule; dimming
-  a screen someone is using is not what an operator wants, and a dimmed
-  animation still costs the graphics card its full load all night.
+- **The night window applies only while idle**, and by default swaps the
+  mode for a dimmed clock rather than dimming whatever runs. The spec dims the
+  wall on a schedule; dimming a screen someone is using is not what an
+  operator wants, and a dimmed animation still costs the graphics card its
+  full load all night. A dimmed clock renders no canvas, and unlike a fully
+  black screen it still reads as alive, with the wake hint, so a night-shift
+  operator does not take it for a dead PC. `blank` is there for screens that
+  should go fully dark.
 - **The demo pipes are not the plant's pipe topology.** They are generic
   pipes, one per bound state/flow. Drawing the real routing needs the P&ID,
   which is the HMI Kit fly-through idea, not this module.
@@ -184,8 +188,8 @@ in order:
 1. `external` stays external: the project draws. `blank` stays blank: the
    night window never lights a dark screen up.
 2. **Night window** (`burnIn.night`, on by default, 22:00-06:00 browser local
-   time): `blank` (default) or `clock` replaces any other mode; `dim` keeps the mode
-   and dims it to `level`. Alarms behave as always: a wake alarm wakes, a
+   time): `clock` (default, dimmed to `level`) or `blank` replaces any other
+   mode; `dim` keeps the mode and dims it to `level`. Alarms behave as always: a wake alarm wakes, a
    pinned one shows its banner and lifts the dimming.
 3. **Shuffle** picks the mode for this slot.
 4. **Reduced motion**: when the viewer wants less motion, every animated mode
@@ -257,7 +261,7 @@ The full schema with descriptions is
 | `alarm.sources` | [] | Glob patterns; empty = all alarms |
 | `alarm.staleAfterSec` | 8 | Fail open after this much feed silence (min 3) |
 | `burnIn.drift` | true | Text wanders on a 7/11-minute Lissajous path |
-| `burnIn.night` | on, 22:00–06:00, blank, 0.4 | While idle inside the window: `mode` blank, clock or dim (to `level`) |
+| `burnIn.night` | on, 22:00–06:00, clock, 0.4 | While idle inside the window: `mode` clock (dimmed to `level`), dim (the configured mode, to `level`) or blank |
 | `lines` | demo set | `[{label, state, flow, color}]`, max 12: one pipe, curtain (max 6) or ring each. state: running, idle, warning, fault, off |
 | `modes.legend` | true | Line legend over pipes and aurora |
 | `modes.clock` | | `title` (also shown in halo), `showSeconds` |
