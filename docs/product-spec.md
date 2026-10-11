@@ -5,6 +5,12 @@ plus a browser bundle. Built the same way as the sibling modules: Gradle with
 `io.ia.sdk.modl`, a React/TypeScript strict web bundle, and Java hooks.
 Evidence and pricing are in [market-fit.md](market-fit.md).
 
+> **Build status:** v0.1 is built: the Idle Guard, its alarm policy, the
+> pipes, aurora, halo and starfield modes (WebGL2, with 2D fallbacks), the
+> clock, blank and external modes, and night dimming. The
+> Andon board, rotation, privacy lock and page orbit are deferred. What
+> changed from this spec and why: [reference.md](reference.md#differences-from-the-spec).
+
 ## 1. User stories
 
 **Plant engineer, 24/7 control-room wall**

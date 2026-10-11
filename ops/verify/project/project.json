@@ -1,0 +1,7 @@
+{
+  "title": "verify",
+  "description": "Mustry Screensaver demo and e2e harness — auto-mounted from the repo (ops/verify/project).",
+  "enabled": true,
+  "inheritable": false,
+  "parent": ""
+}

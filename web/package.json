@@ -1,0 +1,35 @@
+{
+    "name": "ignition-perspective-screensaver-module-web",
+    "version": "0.0.1",
+    "description": "Front-end (React/TypeScript) for the Mustry Screensaver Perspective components.",
+    "private": true,
+    "license": "UNLICENSED",
+    "scripts": {
+        "build": "webpack --mode production",
+        "build:dev": "webpack --mode development",
+        "test": "jest",
+        "preview": "webpack --config webpack.preview.js"
+    },
+    "dependencies": {
+        "@inductiveautomation/perspective-client": "^2.3.9",
+        "react": "16.14.0",
+        "react-dom": "16.14.0"
+    },
+    "devDependencies": {
+        "@types/jest": "^30.0.0",
+        "@types/node": "^22.20.5",
+        "@types/react": "16.14.34",
+        "@types/react-dom": "16.9.17",
+        "css-loader": "^7.1.5",
+        "css-minimizer-webpack-plugin": "^8.0.0",
+        "jest": "^30.5.2",
+        "mini-css-extract-plugin": "^2.10.2",
+        "sass": "^1.105.1",
+        "sass-loader": "^17.0.1",
+        "ts-jest": "^29.4.14",
+        "ts-loader": "^9.6.2",
+        "typescript": "^6.0.3",
+        "webpack": "^5.111.1",
+        "webpack-cli": "^7.2.3"
+    }
+}
