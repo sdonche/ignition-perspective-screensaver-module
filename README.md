@@ -61,7 +61,8 @@ stations.
    never covered. If the guard cannot hear the gateway, it removes itself.
 7. **Burn-in and power care for 24/7 screens.** Text in the idle modes drifts
    slowly so nothing sits on the same pixels. At night (22:00-06:00 by default)
-   an idle screen goes blank, so nothing is rendered; alarms still wake it. The
+   an idle screen shows a dimmed clock instead of any animation: dark, but
+   clearly alive. Alarms still wake it. It can also go fully blank. The
    default mode is the plain clock; the animated modes are opt-in.
 8. **Reduced motion.** When the browser asks for less motion (or
    `config.reduceMotion` is `always`), the animated modes give way to the clock.

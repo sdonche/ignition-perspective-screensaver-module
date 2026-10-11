@@ -196,18 +196,20 @@ describe('night window', () => {
         expect(isNight({ ...NIGHT, from: 'x' }, night)).toBe(false);
     });
 
-    it('dims only in dim mode, inside the window, unless an alarm is pinned', () => {
+    it('dims the clock and dim night modes inside the window, unless an alarm is pinned', () => {
         expect(dimLevel(NIGHT, night, false)).toBe(0.4);
         expect(dimLevel(NIGHT, night, true)).toBe(1);
         expect(dimLevel(NIGHT, day, false)).toBe(1);
         expect(dimLevel({ ...NIGHT, enabled: false }, night, false)).toBe(1);
         expect(dimLevel({ ...NIGHT, level: -2 }, night, false)).toBe(0);
+        expect(dimLevel({ ...NIGHT, mode: 'clock' }, night, false)).toBe(0.4);
         expect(dimLevel({ ...NIGHT, mode: 'blank' }, night, false)).toBe(1);
     });
 
     it('normalises the night mode and the reduce-motion setting', () => {
         expect(normNightMode('CLOCK')).toBe('clock');
-        expect(normNightMode('off')).toBe('blank');
+        expect(normNightMode('BLANK')).toBe('blank');
+        expect(normNightMode('off')).toBe('clock');
         expect(normReduceMotion(' Always ')).toBe('always');
         expect(normReduceMotion('maybe')).toBe('auto');
         expect(wantsReducedMotion('auto', true)).toBe(true);

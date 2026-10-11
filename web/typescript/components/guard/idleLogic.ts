@@ -269,13 +269,13 @@ export type NightMode = 'blank' | 'clock' | 'dim';
 
 export function normNightMode(value: string): NightMode {
     const v = (value || '').trim().toLowerCase();
-    return v === 'clock' || v === 'dim' ? v : 'blank';
+    return v === 'blank' || v === 'dim' ? v : 'clock';
 }
 
 /**
  * The night window (burn-in and power care). While idle inside it the screen
- * goes blank (nothing rendered), shows the plain clock, or keeps the
- * configured mode dimmed to `level`.
+ * shows the plain clock dimmed to `level` (the default: dark, but visibly
+ * alive), keeps the configured mode dimmed to `level`, or goes blank.
  */
 export interface NightConfig {
     enabled: boolean;
@@ -298,9 +298,9 @@ export function isNight(cfg: NightConfig, date: Date): boolean {
     return inWindow(date.getHours() * 60 + date.getMinutes(), from, to);
 }
 
-/** The brightness to apply while idle (1 = no dimming): only the 'dim' night mode dims, and a pinned alarm lifts it. */
+/** The brightness to apply while idle (1 = no dimming): the 'clock' and 'dim' night modes dim, and a pinned alarm lifts it. */
 export function dimLevel(cfg: NightConfig, date: Date, alarmPinned: boolean): number {
-    if (cfg.mode !== 'dim' || alarmPinned || !isNight(cfg, date)) {
+    if (cfg.mode === 'blank' || alarmPinned || !isNight(cfg, date)) {
         return 1;
     }
     return Number.isFinite(cfg.level) ? Math.min(1, Math.max(0, cfg.level)) : 1;

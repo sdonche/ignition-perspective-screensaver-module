@@ -133,7 +133,7 @@ export function mapGuardProps(tree: PropReader): GuardProps {
                 enabled: tree.readBoolean('burnIn.night.enabled', true),
                 from: tree.readString('burnIn.night.from', '22:00'),
                 to: tree.readString('burnIn.night.to', '06:00'),
-                mode: normNightMode(tree.readString('burnIn.night.mode', 'blank')),
+                mode: normNightMode(tree.readString('burnIn.night.mode', 'clock')),
                 level: Number(tree.readNumber('burnIn.night.level', 0.4))
             }
         },

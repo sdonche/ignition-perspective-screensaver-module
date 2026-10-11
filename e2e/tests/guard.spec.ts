@@ -313,16 +313,20 @@ test.describe('night window', () => {
     // 1 a.m. in the browser: inside the default 22:00-06:00 window.
     test.use({ timezoneId: zoneWhereHourIs(1) });
 
-    test('an idle screen rests at night: blank, nothing rendered, still wakes', async ({ page }) => {
+    test('an idle screen rests at night: a dimmed clock, no canvas, never black, still wakes', async ({ page }) => {
         await openGuarded(page, 'pipes', 5);
         const overlay = await waitIdle(page);
-        await expect(overlay).toHaveAttribute('data-mode', 'blank');
+        await expect(overlay).toHaveAttribute('data-mode', 'clock');
         await expect(overlay).toHaveAttribute('data-reason', 'night');
         // onIdle reports what is shown, not config.mode.
-        await expect(guardStatus(page)).toContainText('showing: blank');
+        await expect(guardStatus(page)).toContainText('showing: clock');
         await expect(page.locator('.mustry-idle-canvas')).toHaveCount(0);
-        await page.waitForTimeout(1_500);
-        expect(await litShare(page, 30)).toBeLessThan(0.001);
+        await expect(page.locator('.mustry-idle-clock__time')).toBeVisible();
+        await expect(page.locator('.mustry-idle-hint')).toBeVisible();
+        await expect(page.locator('.mustry-idle-dim')).toHaveCount(1);
+        // Dark, but not black: the dim layer lets the default 40 % through.
+        const shade = await page.locator('.mustry-idle-dim').evaluate((el) => Number(getComputedStyle(el).opacity));
+        expect(shade).toBeCloseTo(0.6, 2);
         await page.mouse.move(10, 10);
         await page.mouse.move(300, 300, { steps: 3 });
         await expect(page.locator(OVERLAY)).toHaveCount(0);

@@ -142,7 +142,7 @@
         "night": {
           "type": "object",
           "additionalProperties": false,
-          "description": "The night window: while idle inside it the screen rests, which saves power and panel life. 'blank' renders nothing (the default), 'clock' shows the plain clock, 'dim' keeps the configured mode dimmed to 'level'. Alarms behave as always: a wake alarm wakes the page, a pinned one shows its banner (and lifts the dimming).",
+          "description": "The night window: while idle inside it the screen rests, which saves power and panel life. 'clock' (the default) shows the plain clock dimmed to 'level', so the screen still reads as alive; 'dim' keeps the configured mode dimmed to 'level'; 'blank' renders nothing. Alarms behave as always: a wake alarm wakes the page, a pinned one shows its banner (and lifts the dimming).",
           "properties": {
             "enabled": {
               "type": "boolean",
@@ -165,7 +165,7 @@
                 "clock",
                 "dim"
               ],
-              "default": "blank",
+              "default": "clock",
               "description": "What the idle screen shows inside the window."
             },
             "level": {
@@ -173,7 +173,7 @@
               "default": 0.4,
               "minimum": 0,
               "maximum": 1,
-              "description": "Brightness for the 'dim' night mode: 1 = no dimming, 0 = black."
+              "description": "Brightness at night for the 'clock' and 'dim' night modes: 1 = no dimming, 0 = black."
             }
           }
         }

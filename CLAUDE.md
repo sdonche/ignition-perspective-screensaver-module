@@ -41,7 +41,7 @@ there, not in the README.
   the schema enum, and the e2e `CANVAS_MODES` table with a measured threshold.
 - Burn-in: nothing static may sit on the same pixels for hours. Text drifts
   (`drift()`), fixed layouts (pong's field) wander a little.
-- Defaults stay calm: `clock` by default, the night window on (blank). The
+- Defaults stay calm: `clock` by default, the night window on (dimmed clock). The
   e2e suite pins the browser to a midday time zone (`e2e/clockZone.ts`) so the
   window never interferes; the night test picks a 1 a.m. zone.
 - Visual work: `cd web && npm run preview`, open
