@@ -5,6 +5,14 @@ plugins {
     id("com.github.node-gradle.node") version "7.1.0"
 }
 
+// Same Java level as the other scopes: without it this project takes the JVM
+// Gradle runs on, and the gateway (17) can't depend on it when that is newer.
+java {
+    toolchain {
+        languageVersion.set(org.gradle.jvm.toolchain.JavaLanguageVersion.of(17))
+    }
+}
+
 // Where webpack writes the built bundle; this whole dir becomes module resources.
 val projectOutput: Provider<Directory> = layout.buildDirectory.dir("generated-resources")
 
