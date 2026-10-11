@@ -158,7 +158,8 @@ def guard_dock():
             "props.text": expr(
                 "'Idle Guard: ' + try({session.custom.guard.mode}, 'pipes') + ' after ' + "
                 "try({session.custom.guard.timeout}, 600) + ' s · last wake: ' + "
-                "try(if({session.custom.screensaver.cause} = '', 'none', {session.custom.screensaver.cause}), 'none')"
+                "try(if({session.custom.screensaver.cause} = '', 'none', {session.custom.screensaver.cause}), 'none') + "
+                "' · showing: ' + try(if({session.custom.screensaver.mode} = '', '-', {session.custom.screensaver.mode}), '-')"
             )
         },
     }

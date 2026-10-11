@@ -24,10 +24,16 @@ describe('modeToShow', () => {
     });
 
     it('rests at night: blank or clock, whatever was configured', () => {
-        for (const mode of [...CANVAS_MODES, 'shuffle', 'clock', 'blank'] as Mode[]) {
+        for (const mode of [...CANVAS_MODES, 'shuffle', 'clock'] as Mode[]) {
             expect(modeToShow(input({ mode, now: NIGHT }))).toEqual({ mode: 'blank', reason: 'night' });
         }
         expect(modeToShow(input({ now: NIGHT, night: { ...NIGHT_CFG, mode: 'clock' } }))).toEqual({ mode: 'clock', reason: 'night' });
+    });
+
+    it('never lights up a blank screen at night', () => {
+        expect(modeToShow(input({ mode: 'blank', now: NIGHT }))).toEqual({ mode: 'blank', reason: 'configured' });
+        expect(modeToShow(input({ mode: 'blank', now: NIGHT, night: { ...NIGHT_CFG, mode: 'clock' } })))
+            .toEqual({ mode: 'blank', reason: 'configured' });
     });
 
     it('keeps the mode at night when the night mode is dim, or the window is off', () => {

@@ -274,3 +274,11 @@ $z-top: 2147483000;
 .mustry-idle-canvas {
     animation: mustry-idle-in 1.2s ease-out;
 }
+
+// Reduced motion (config.reduceMotion, or the browser's preference under auto):
+// no fade-in, no glide. Drifting text still moves, in invisible one-second steps.
+.mustry-idle-overlay--still,
+.mustry-idle-overlay--still * {
+    animation: none !important;
+    transition: none !important;
+}

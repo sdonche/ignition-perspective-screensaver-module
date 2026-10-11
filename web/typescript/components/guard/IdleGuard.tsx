@@ -17,6 +17,7 @@ import {
     AlarmPolicy, AlarmVerdict, evaluateAlarms, IdleState, initialState, input, movedEnough, Point, StepResult, tick,
     timeoutMs, WakeCause, wantsReducedMotion
 } from './idleLogic';
+import { modeToShow, Shown } from './modes/modeToShow';
 
 // Must match IdleGuard.COMPONENT_ID on the Java side.
 export const COMPONENT_TYPE = 'mustrysolutions.perspective.screensaver.idleguard';
@@ -60,13 +61,19 @@ function isDesigner(store: AbstractUIElementStore): boolean {
     }
 }
 
+/** One live prefers-reduced-motion query, made on first use; null where matchMedia is missing. */
+let motionQuery: MediaQueryList | null | undefined;
+
 /** The browser's prefers-reduced-motion (set in the OS, or by a kiosk policy). */
 function prefersReducedMotion(): boolean {
-    try {
-        return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch (e) {
-        return false;
+    if (motionQuery === undefined) {
+        try {
+            motionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+        } catch (e) {
+            motionQuery = null;
+        }
     }
+    return motionQuery !== null && motionQuery.matches;
 }
 
 function policyOf(p: GuardProps): AlarmPolicy {
@@ -254,6 +261,10 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
             verdict
         }), now);
         this.writeAlarmOutputs(verdict);
+        if (this.machine.phase === 'idle') {
+            // Night, shuffle and reduced motion change what is shown while idle.
+            this.write('output.mode', this.shown(now).mode);
+        }
         const prev = this.state.verdict;
         const verdictChanged = !prev || prev.pin !== verdict.pin || prev.highest !== verdict.highest
             || prev.feedOk !== verdict.feedOk || JSON.stringify(prev.counted) !== JSON.stringify(verdict.counted)
@@ -281,7 +292,7 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
             this.setState({ covering: true, fading: false, now });
             this.writeOutputs();
             this.props.componentEvents.fireComponentEvent('onIdle', {
-                mode: this.props.props.config.mode,
+                mode: this.shown(now).mode,
                 idleSince: this.machine.idleSince
             });
         } else if (t !== null && t.type === 'wake') {
@@ -332,7 +343,7 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
         const m = this.machine;
         this.write('output.idle', m.phase === 'idle');
         this.write('output.idleSince', m.idleSince);
-        this.write('output.mode', m.phase === 'idle' ? this.props.props.config.mode : '');
+        this.write('output.mode', m.phase === 'idle' ? this.shown(Date.now()).mode : '');
         this.write('output.wakeCause', m.wakeCause);
         this.lastInputWritten = Date.now();
         this.write('output.lastInput', m.lastInput);
@@ -385,6 +396,23 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
 
     // --- rendering ---------------------------------------------------------------------
 
+    private reduceMotion(): boolean {
+        return wantsReducedMotion(this.props.props.config.reduceMotion, prefersReducedMotion());
+    }
+
+    /** What the cover shows at `now`: the configured mode after night, shuffle and reduced motion. */
+    private shown(now: number): Shown {
+        const p = this.props.props;
+        return modeToShow({
+            mode: p.config.mode,
+            shuffle: p.modes.shuffle,
+            night: p.burnIn.night,
+            reduceMotion: this.reduceMotion(),
+            coverSince: this.coverSince,
+            now
+        });
+    }
+
     render() {
         const p = this.props.props;
         const designer = isDesigner(this.props.store);
@@ -403,8 +431,8 @@ export class IdleGuard extends Component<ComponentProps<GuardProps, GuardDelegat
                         verdict={this.state.verdict}
                         now={this.state.now}
                         fading={this.state.fading}
-                        coverSince={this.coverSince}
-                        reduceMotion={wantsReducedMotion(p.config.reduceMotion, prefersReducedMotion())}
+                        shown={this.shown(this.state.now)}
+                        reduceMotion={this.reduceMotion()}
                     />,
                     this.host
                 )}

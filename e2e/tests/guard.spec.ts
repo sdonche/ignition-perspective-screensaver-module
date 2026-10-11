@@ -318,6 +318,8 @@ test.describe('night window', () => {
         const overlay = await waitIdle(page);
         await expect(overlay).toHaveAttribute('data-mode', 'blank');
         await expect(overlay).toHaveAttribute('data-reason', 'night');
+        // onIdle reports what is shown, not config.mode.
+        await expect(guardStatus(page)).toContainText('showing: blank');
         await expect(page.locator('.mustry-idle-canvas')).toHaveCount(0);
         await page.waitForTimeout(1_500);
         expect(await litShare(page, 30)).toBeLessThan(0.001);
@@ -335,6 +337,8 @@ test.describe('reduced motion', () => {
         const overlay = await waitIdle(page);
         await expect(overlay).toHaveAttribute('data-mode', 'clock');
         await expect(overlay).toHaveAttribute('data-reason', 'reduced-motion');
+        await expect(overlay).toHaveClass(/mustry-idle-overlay--still/);
+        await expect(guardStatus(page)).toContainText('showing: clock');
         await expect(page.locator('.mustry-idle-canvas')).toHaveCount(0);
         await expect(page.locator('.mustry-idle-clock__time')).toBeVisible();
     });

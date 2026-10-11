@@ -181,19 +181,24 @@ Perspective, which is the fast loop for visual work. Not part of the module.
 `modes/modeToShow.ts` (pure, tested) starts from `config.mode` and applies,
 in order:
 
-1. `external` stays external: the project draws.
+1. `external` stays external: the project draws. `blank` stays blank: the
+   night window never lights a dark screen up.
 2. **Night window** (`burnIn.night`, on by default, 22:00-06:00 browser local
-   time): `blank` (default) or `clock` replaces any mode; `dim` keeps the mode
+   time): `blank` (default) or `clock` replaces any other mode; `dim` keeps the mode
    and dims it to `level`. Alarms behave as always: a wake alarm wakes, a
    pinned one shows its banner and lifts the dimming.
 3. **Shuffle** picks the mode for this slot.
 4. **Reduced motion**: when the viewer wants less motion, every animated mode
    becomes the clock. `config.reduceMotion` `auto` follows the browser's
    `prefers-reduced-motion`; `always` forces it on a kiosk that has no such
-   setting; `never` ignores it.
+   setting; `never` ignores it. The overlay's fade-in and the text's glide
+   are switched off too (`mustry-idle-overlay--still`).
 
 The overlay carries `data-mode` (what is shown) and `data-reason`
-(`configured`, `night`, `shuffle`, `reduced-motion`).
+(`configured`, `night`, `shuffle`, `reduced-motion`). `output.mode` and the
+`onIdle` event's `mode` report the same shown mode, not `config.mode`;
+`output.mode` follows it while idle (a shuffle slot, the night window
+starting).
 
 The default `config.mode` is `clock`: it renders no canvas at all, so a guard
 dropped in with no configuration costs no graphics load on a 24/7 screen.

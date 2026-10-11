@@ -8,7 +8,7 @@ import { CANVAS_MODES, GuardProps, MAX_LINES, Mode } from './guardProps';
 import { AlarmFeed, AlarmVerdict, countsText, dimLevel, drift, plural, PRIORITIES } from './idleLogic';
 import { MAX_CURTAINS } from './modes/gl/aurora';
 import { HALO_DRIFT, HALO_LABEL_ANGLE, haloRadii } from './modes/haloLayout';
-import { modeToShow } from './modes/modeToShow';
+import { Shown } from './modes/modeToShow';
 import { pipeColor } from './modes/pipesSim';
 
 export interface CoverProps {
@@ -19,9 +19,9 @@ export interface CoverProps {
     now: number;
     /** Fading out after a wake. */
     fading: boolean;
-    /** When this cover went up (shuffle's clock). */
-    coverSince: number;
-    /** The viewer wants less motion (browser preference or config.reduceMotion). */
+    /** What to show (modeToShow: night, shuffle and reduced motion applied). */
+    shown: Shown;
+    /** The viewer wants less motion (browser preference or config.reduceMotion): no fades or glides either. */
     reduceMotion: boolean;
 }
 
@@ -110,14 +110,7 @@ function Banner({ props, verdict, feed, style }: { props: GuardProps; verdict: A
 
 export function Cover(c: CoverProps) {
     const p = c.props;
-    const shown = modeToShow({
-        mode: p.config.mode,
-        shuffle: p.modes.shuffle,
-        night: p.burnIn.night,
-        reduceMotion: c.reduceMotion,
-        coverSince: c.coverSince,
-        now: c.now
-    });
+    const shown = c.shown;
     const mode = shown.mode;
     const pinned = c.verdict !== null && c.verdict.pin;
     const dim = dimLevel(p.burnIn.night, new Date(c.now), pinned);
@@ -129,10 +122,10 @@ export function Cover(c: CoverProps) {
     const driftStyle = { transform: `translate(${(d.x * 18).toFixed(2)}vw, ${(d.y * 14).toFixed(2)}vh)` };
     return (
         <div
-            className={`mustry-idle-overlay mustry-idle-overlay--${mode}${c.fading ? ' mustry-idle-overlay--fading' : ''}`}
+            className={`mustry-idle-overlay mustry-idle-overlay--${mode}${c.fading ? ' mustry-idle-overlay--fading' : ''}${c.reduceMotion ? ' mustry-idle-overlay--still' : ''}`}
             data-mode={mode}
             data-reason={shown.reason}
-            data-shuffle={p.config.mode === 'shuffle' ? 'true' : undefined}
+            data-shuffle={shown.reason === 'shuffle' ? 'true' : undefined}
             role="presentation"
         >
             {CANVAS_MODES.includes(mode) && <CanvasMode mode={mode} props={p} />}

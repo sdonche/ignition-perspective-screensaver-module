@@ -24,9 +24,10 @@ export interface Shown {
 }
 
 export function modeToShow(i: ShowInput): Shown {
-    // External means the project draws: nothing here overrides that.
-    if (i.mode === 'external') {
-        return { mode: 'external', reason: 'configured' };
+    // External means the project draws: nothing here overrides that. Blank is
+    // already as dark as it gets: the night clock must not light it up.
+    if (i.mode === 'external' || i.mode === 'blank') {
+        return { mode: i.mode, reason: 'configured' };
     }
     // At night the screen rests: nothing animated, nothing rendered when blank.
     if (i.night.mode !== 'dim' && isNight(i.night, new Date(i.now))) {
